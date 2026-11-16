@@ -27,7 +27,7 @@ struct GameTuning: Codable, Equatable {
         var escaped = false
         for char in launchArguments {
             if escaped { current.append(char); escaped = false; continue }
-            if char == "\\\\" { escaped = true; continue }
+            if char == "\\" { escaped = true; continue }
             if char == "\"" || char == "'" {
                 if quote == char { quote = nil }
                 else if quote == nil { quote = char }
@@ -36,7 +36,7 @@ struct GameTuning: Codable, Equatable {
                 if !current.isEmpty { output.append(current); current = "" }
             } else { current.append(char) }
         }
-        if escaped { current.append("\\\\") }
+        if escaped { current.append("\\") }
         if !current.isEmpty { output.append(current) }
         return output
     }
