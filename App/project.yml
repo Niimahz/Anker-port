@@ -1,0 +1,18 @@
+name: AnkerPortStudio
+options:
+  bundleIdPrefix: com.ankergamebridge
+settings:
+  base:
+    SWIFT_VERSION: '5.9'
+    IPHONEOS_DEPLOYMENT_TARGET: '16.0'
+targets:
+  AnkerPortStudio:
+    type: application
+    platform: iOS
+    sources: [Sources]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ankergamebridge.portstudio
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Anker Port Studio
+        INFOPLIST_KEY_UIFileSharingEnabled: YES
