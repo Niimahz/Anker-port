@@ -24,6 +24,35 @@ jobs:
         run: |
           git ls-remote https://github.com/willfaust/Madeira.git HEAD
           git ls-remote https://github.com/willfaust/Madeira.git | grep -q 'fbad430410b4075192166172447c859714726de9' || echo 'Pinned SHA is not advertised as a branch tip; checkout will verify it.'
+  prepare-integrated-source:
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned upstream application source
+        run: |
+          git clone --filter=blob:none https://github.com/willfaust/Madeira.git native-src
+          git -C native-src checkout fbad430410b4075192166172447c859714726de9
+      - name: Apply Anker integration and validate generated Swift
+        run: |
+          python3 runtime/tools/brand-upstream.py native-src
+          python3 runtime/tools/integrate-upstream.py native-src
+          swiftc -frontend -parse native-src/app/Madeira/MadeiraApp.swift
+          grep -q 'ANKER_PORT_INTEGRATION_V1' native-src/app/Madeira/MadeiraApp.swift
+          /usr/bin/python3 - <<'PY'
+          import plistlib
+          with open('native-src/app/Madeira/Info.plist', 'rb') as f:
+              assert plistlib.load(f)['CFBundleDisplayName'] == 'Anker Port'
+          PY
+      - name: Upload integrated app source for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnkerPort-Integrated-App-Source
+          path: |
+            native-src/app/Madeira/MadeiraApp.swift
+            native-src/app/Madeira/Info.plist
+          retention-days: 14
   native-runtime:
     needs: preflight
     runs-on: macos-15
