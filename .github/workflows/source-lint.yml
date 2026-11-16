@@ -17,6 +17,12 @@ jobs:
         run: python3 -m py_compile runtime/tools/brand-upstream.py runtime/tools/integrate-upstream.py runtime/tools/verify-ipa.py
       - name: Test fork branding overlay and preserved runtime identifiers
         run: python3 -m unittest discover -s tests -p "test_*.py" -v
+      - name: Parse integrated Madeira Swift entry point
+        run: |
+          mkdir -p /tmp/anker-upstream/app/Madeira
+          printf 'import SwiftUI\nstruct MadeiraApp { var body: some Scene { WindowGroup {\n            ContentView()\n} } }\n' > /tmp/anker-upstream/app/Madeira/MadeiraApp.swift
+          python3 runtime/tools/integrate-upstream.py /tmp/anker-upstream
+          swiftc -frontend -parse /tmp/anker-upstream/app/Madeira/MadeiraApp.swift
       - name: Validate shell syntax
         run: |
           bash -n runtime/tools/prepare-native.sh
