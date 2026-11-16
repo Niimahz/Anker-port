@@ -82,6 +82,8 @@ jobs:
               raise SystemExit('ARM64 iOS clang probe failed; see feasibility report')
           print('PASS: Linux clang compiled a freestanding arm64-apple-ios object')
           PY
+      - name: Probe Linux Mach-O iOS linking tools
+        run: python3 runtime/tools/probe-ios-link.py
       - name: Package Linux-prepared native source (not an IPA)
         run: |
           git -C native-src rev-parse HEAD > native-source-revision.txt
@@ -98,4 +100,5 @@ jobs:
             AnkerPort-Native-Source.sha256
             native-source-revision.txt
             AnkerPort-Linux-Build-Feasibility.json
+            AnkerPort-iOS-Link-Probe.json
           retention-days: 14
