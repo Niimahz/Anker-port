@@ -13,7 +13,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Checkout GPL runtime source with native components
         run: |
-          git clone --recurse-submodules https://github.com/willfaust/Madeira.git native-src
+          git clone https://github.com/willfaust/Madeira.git native-src
+          git -C native-src checkout fbad430410b4075192166172447c859714726de9
+          git -C native-src submodule update --init --recursive
           git -C native-src rev-parse HEAD > native-source-revision.txt
           cat native-source-revision.txt
       - name: Apply Anker Port product overlay before compilation
