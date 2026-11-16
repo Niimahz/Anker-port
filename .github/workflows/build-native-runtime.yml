@@ -1,0 +1,34 @@
+name: Compile real on-device Windows runtime
+on:
+  workflow_dispatch:
+jobs:
+  native-runtime:
+    runs-on: macos-15
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout GPL runtime source with native components
+        run: |
+          git clone --recurse-submodules https://github.com/willfaust/Madeira.git native-src
+          git -C native-src rev-parse HEAD > native-source-revision.txt
+          cat native-source-revision.txt
+      - name: Build real Wine FEX DXMT runtime and iOS app
+        working-directory: native-src
+        env:
+          JOBS: 4
+        run: |
+          ./tools/build-ipa.sh
+      - name: Verify native IPA contains actual runtime
+        run: |
+          test -s native-src/dist/Madeira.ipa
+          unzip -tq native-src/dist/Madeira.ipa
+          unzip -l native-src/dist/Madeira.ipa | grep 'xtajit64.dll'
+          unzip -l native-src/dist/Madeira.ipa | grep 'prefix-template.tar.gz'
+      - name: Preserve unmodified upstream runtime test build
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-windows-runtime-reference-IPA
+          path: |
+            native-src/dist/Madeira.ipa
+            native-source-revision.txt
+          retention-days: 7
