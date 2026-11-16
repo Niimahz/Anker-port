@@ -111,12 +111,14 @@ struct GameDetailScreen: View {
                 }
             }
             Section("Launcher") {
+                NavigationLink("Compatibility & performance settings") { TuningScreen(folder: folder) }
                 Text(RuntimeLauncher.isAvailable ? "Runtime ready" : "Native runtime is not linked in this build.")
                     .font(.caption)
                 Button("Launch game") {
                     guard let selectedExecutable else { return }
                     do {
-                        let request = RuntimeLaunchRequest(gameFolder: folder, executable: folder.appendingPathComponent(selectedExecutable), arguments: [], environment: [:])
+                        let tuning = GameTuningStore.load(for: folder)
+                        let request = RuntimeLaunchRequest(gameFolder: folder, executable: folder.appendingPathComponent(selectedExecutable), arguments: tuning.arguments, environment: tuning.environment)
                         let result = try RuntimeLauncher.launch(request)
                         status = result.diagnostic
                     } catch { status = error.localizedDescription }
