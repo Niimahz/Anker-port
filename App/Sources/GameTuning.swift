@@ -20,10 +20,14 @@ struct GameTuning: Codable, Equatable {
         var id: String { rawValue }
     }
     var arguments: [String] {
-        // Keep quoted arguments together; no shell is invoked.\n        // Backslash escapes quotes and spaces; malformed trailing escapes are literal.
+        // Keep quoted arguments together; no shell is invoked.
+        // Backslash escapes quotes and spaces; malformed trailing escapes are literal.
         var output: [String] = [], current = ""
         var quote: Character?
-        var escaped = false\n        for char in launchArguments {\n            if escaped { current.append(char); escaped = false; continue }\n            if char == "\\\\" { escaped = true; continue }
+        var escaped = false
+        for char in launchArguments {
+            if escaped { current.append(char); escaped = false; continue }
+            if char == "\\\\" { escaped = true; continue }
             if char == "\"" || char == "'" {
                 if quote == char { quote = nil }
                 else if quote == nil { quote = char }
@@ -32,7 +36,8 @@ struct GameTuning: Codable, Equatable {
                 if !current.isEmpty { output.append(current); current = "" }
             } else { current.append(char) }
         }
-        if escaped { current.append("\\\\") }\n        if !current.isEmpty { output.append(current) }
+        if escaped { current.append("\\\\") }
+        if !current.isEmpty { output.append(current) }
         return output
     }
     var environment: [String: String] {
