@@ -28,6 +28,16 @@ jobs:
           unzip -tq native-src/dist/Madeira.ipa
           unzip -l native-src/dist/Madeira.ipa | grep 'xtajit64.dll'
           unzip -l native-src/dist/Madeira.ipa | grep 'prefix-template.tar.gz'
+      - name: Stage reusable native libraries and guest runtime
+        run: |
+          bash runtime/tools/prepare-native.sh native-src runtime/staged
+          bash runtime/tools/verify-native.sh runtime/staged
+      - name: Upload native runtime development artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: anker-native-runtime-staged
+          path: runtime/staged/
+          retention-days: 7
       - name: Preserve unmodified upstream runtime test build
         uses: actions/upload-artifact@v4
         with:
