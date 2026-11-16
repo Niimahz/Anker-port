@@ -1,22 +1,32 @@
-# Anker Port Studio
+# Anker Port — iOS Windows Game Studio
 
-Experimental iOS PC game inspection and compatibility-profile application. This initial scaffold does **not** run Windows games or build standalone game IPAs.
+An independent iOS game library and compatibility project. The goal is to launch user-supplied Windows games on-device, then optionally build standalone game IPAs **after real on-device testing**.
 
-## Phase 0
-- SwiftUI folder picker
-- Read-only PE executable inspection: x86/x64/ARM64 and imported DLL names
-- BAT/CMD discovery (never executed)
-- JSON compatibility profile export (status: untested)
-- Separate Madeira and PlayPort runtime adapter interfaces (integration pending)
+## Current implemented source
+- SwiftUI Library, Downloads and Analyzer tabs
+- Anker's concurrent/segmented downloader and background download manager
+- Archive import from Files; ZIP extraction via ZIPFoundation and other supported archive formats via LibArchive
+- Local game folders and per-game inspection
+- PE EXE/DLL analysis (architecture and imported DLLs), BAT/CMD discovery
+- Compatibility profile JSON export
+
+## Not implemented or verified
+- Wine/FEX/DXMT Windows game execution: **not yet integrated**
+- Game-specific standalone IPA packaging: **not yet integrated**
+- iPhone runtime validation: **not tested**
+- Successful iOS compilation: pending GitHub Actions result
+
+The launcher is deliberately disabled rather than pretending to run a Windows executable.
 
 ## Build
-Install XcodeGen, then run `cd App && xcodegen generate` on macOS. Open the generated Xcode project and configure signing. The project has not been compiled or device-tested yet.
+The GitHub Actions workflow `.github/workflows/build-ipa.yml` generates an unsigned iOS IPA when the macOS runner completes successfully. Local build: `cd App && xcodegen generate` then build in Xcode with signing configured.
 
-## Roadmap
-1. Reuse audited Anker download/archive code with attribution.
-2. Integrate and validate Madeira Wine/FEX/DXMT in-process runtime.
-3. Add PlayPort adapter after checking code and dependency compatibility.
-4. Test real games on device and record crash/FPS results.
-5. Implement standalone IPA export only after reliable runtime testing.
+## License and attribution
+Some source modules were adapted from the user's Anker Game Downloader project. Third-party dependencies retain their own licenses. Future integration of GPL-3.0-or-later runtime code must comply with corresponding source distribution and notice requirements. Runtime implementation names may be hidden from normal gameplay UI, but legal attribution cannot be removed.
 
-Madeira and PlayPort are GPL-3.0-or-later projects. Source reuse and distribution must comply with applicable licenses. Game files must be lawfully supplied.
+## Engineering milestones
+1. Verify compilation, resolve errors, test downloader/extraction.
+2. Bring in selected Anker browser and advanced archive features.
+3. Build in-process Windows runtime with Wine, x86 translation, and graphics translation; verify signing/JIT behavior.
+4. Launch real games and record device diagnostics.
+5. Add reproducible per-game IPA packaging after stable execution.
