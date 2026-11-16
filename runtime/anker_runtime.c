@@ -24,6 +24,10 @@ int anker_runtime_initialize(const anker_runtime_config *cfg) {
     host.jit_rx = cfg->jit_rx;
     host.jit_rw = cfg->jit_rw;
     host.jit_size = cfg->jit_size;
+    char selfcheck[512];
+    int check = wine_host_selfcheck(cfg->jit_rx, cfg->jit_rw, cfg->jit_size,
+                                    selfcheck, sizeof(selfcheck));
+    if (check != 0) return -3;
     return wine_host_init(&host);
 }
 int anker_runtime_start_session(int timeout_ms) {
