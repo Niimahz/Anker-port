@@ -1,0 +1,24 @@
+name: Fast source syntax checks
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'App/Sources/**'
+      - 'runtime/**'
+      - '.github/workflows/source-lint.yml'
+  workflow_dispatch:
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Python overlay
+        run: python3 -m py_compile runtime/tools/brand-upstream.py
+      - name: Validate shell syntax
+        run: |
+          bash -n runtime/tools/prepare-native.sh
+          bash -n runtime/tools/verify-native.sh
+      - name: Parse Swift source (no iOS SDK required)
+        run: |
+          find App/Sources -name '*.swift' -print0 | xargs -0 swiftc -frontend -parse
