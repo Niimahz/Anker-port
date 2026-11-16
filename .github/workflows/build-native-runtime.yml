@@ -71,6 +71,8 @@ jobs:
           with (root / "Info.plist").open("rb") as handle:
               assert plistlib.load(handle)["CFBundleDisplayName"] == "Anker Port"
           PY
+      - name: Audit Linux iOS build feasibility
+        run: python3 runtime/tools/check-linux-ios-build.py native-src
       - name: Package Linux-prepared native source (not an IPA)
         run: |
           git -C native-src rev-parse HEAD > native-source-revision.txt
@@ -86,4 +88,5 @@ jobs:
             AnkerPort-Native-Source.tar.gz
             AnkerPort-Native-Source.sha256
             native-source-revision.txt
+            AnkerPort-Linux-Build-Feasibility.json
           retention-days: 14
