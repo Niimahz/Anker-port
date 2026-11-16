@@ -40,12 +40,14 @@ jobs:
           unzip -tq native-src/dist/AnkerPort-Native.ipa
           unzip -p native-src/dist/AnkerPort-Native.ipa Payload/Madeira.app/Info.plist > /tmp/anker-info.plist
           /usr/libexec/PlistBuddy -c 'Print CFBundleDisplayName' /tmp/anker-info.plist | grep -Fx 'Anker Port'
+          python3 runtime/tools/verify-ipa.py native-src/dist/AnkerPort-Native.ipa --revision "$(cat native-source-revision.txt)"
       - name: Preserve fork-derived Anker Port native IPA
         uses: actions/upload-artifact@v4
         with:
           name: AnkerPort-Native-IPA
           path: |
             native-src/dist/AnkerPort-Native.ipa
+            native-src/dist/AnkerPort-Native.manifest.json
             native-source-revision.txt
           retention-days: 7
       - name: Stage reusable native libraries and guest runtime
