@@ -1,6 +1,13 @@
 name: Inspect and prepare native runtime sources
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'runtime/anker_runtime.c'
+      - 'runtime/include/**'
+      - 'runtime/tools/**'
+      - '.github/workflows/native-runtime-source.yml'
 jobs:
   provenance:
     runs-on: ubuntu-latest
@@ -22,6 +29,8 @@ jobs:
           mkdir -p /tmp/anker-headers
           cp upstream-runtime/app/Sources/WineHost/include/*.h /tmp/anker-headers/
           cc -std=c11 -fsyntax-only -Iruntime/include -I/tmp/anker-headers runtime/anker_runtime.c
+      - name: Validate Anker overlay Python syntax
+        run: python3 -m py_compile runtime/tools/brand-upstream.py
       - name: Verify license and source pin
         run: |
           grep -q 'GNU GENERAL PUBLIC LICENSE' upstream-runtime/LICENSE
