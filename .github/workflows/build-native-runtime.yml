@@ -73,7 +73,11 @@ jobs:
           PY
       - name: Package Linux-prepared native source (not an IPA)
         run: |
-          tar -czf AnkerPort-Native-Source.tar.gz -C native-src app/Madeira/MadeiraApp.swift app/Madeira/Info.plist
+          git -C native-src rev-parse HEAD > native-source-revision.txt
+          tar -czf AnkerPort-Native-Source.tar.gz --exclude='.git' -C native-src .
+          test -s AnkerPort-Native-Source.tar.gz
+          tar -tzf AnkerPort-Native-Source.tar.gz | grep -q './tools/build-ipa.sh'
+          tar -tzf AnkerPort-Native-Source.tar.gz | grep -q './app/Madeira/MadeiraApp.swift'
           sha256sum AnkerPort-Native-Source.tar.gz > AnkerPort-Native-Source.sha256
       - uses: actions/upload-artifact@v4
         with:
@@ -81,4 +85,5 @@ jobs:
           path: |
             AnkerPort-Native-Source.tar.gz
             AnkerPort-Native-Source.sha256
+            native-source-revision.txt
           retention-days: 14
