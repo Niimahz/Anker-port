@@ -8,7 +8,7 @@ DEST="${2:-$ROOT/runtime/staged}"
 [[ -f "$UPSTREAM/app/Madeira/libwineserver.a" ]] || { echo "Missing native wineserver archive" >&2; exit 1; }
 [[ -f "$UPSTREAM/app/Madeira/libwin32u_unix.a" ]] || { echo "Missing native win32u archive" >&2; exit 1; }
 [[ -f "$UPSTREAM/app/Madeira/libdxmt_combined.a" ]] || { echo "Missing native graphics archive" >&2; exit 1; }
-[[ -f "$UPSTREAM/app/Madeira/arm64ec-windows/xtajit64.dll" ]] || { echo "Missing x64 translation DLL" >&2; exit 1; }
+[[ -s "$UPSTREAM/app/Madeira/arm64ec-windows/xtajit64.dll" ]] || { echo "Missing x64 translation DLL" >&2; exit 1; }
 mkdir -p "$DEST/lib" "$DEST/Runtime"
 for name in libntdll_unix.a libwineserver.a libwin32u_unix.a libdxmt_combined.a libgnutls.a libhogweed.a libnettle.a libgmp.a; do
   if [[ -f "$UPSTREAM/app/Madeira/$name" ]]; then cp "$UPSTREAM/app/Madeira/$name" "$DEST/lib/"; fi
