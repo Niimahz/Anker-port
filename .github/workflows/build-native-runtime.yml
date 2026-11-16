@@ -16,6 +16,10 @@ jobs:
           git clone --recurse-submodules https://github.com/willfaust/Madeira.git native-src
           git -C native-src rev-parse HEAD > native-source-revision.txt
           cat native-source-revision.txt
+      - name: Apply Anker Port product overlay before compilation
+        run: |
+          python3 runtime/tools/brand-upstream.py native-src
+          /usr/libexec/PlistBuddy -c 'Print CFBundleDisplayName' native-src/app/Madeira/Info.plist | grep -Fx 'Anker Port'
       - name: Build real Wine FEX DXMT runtime and iOS app
         working-directory: native-src
         env:
@@ -38,11 +42,17 @@ jobs:
           name: anker-native-runtime-staged
           path: runtime/staged/
           retention-days: 7
-      - name: Preserve unmodified upstream runtime test build
+      - name: Rename and validate Anker Port fork-derived IPA
+        run: |
+          cp native-src/dist/Madeira.ipa native-src/dist/AnkerPort-Native.ipa
+          unzip -tq native-src/dist/AnkerPort-Native.ipa
+          unzip -p native-src/dist/AnkerPort-Native.ipa Payload/Madeira.app/Info.plist > /tmp/anker-info.plist
+          /usr/libexec/PlistBuddy -c 'Print CFBundleDisplayName' /tmp/anker-info.plist | grep -Fx 'Anker Port'
+      - name: Preserve fork-derived Anker Port native IPA
         uses: actions/upload-artifact@v4
         with:
-          name: native-windows-runtime-reference-IPA
+          name: AnkerPort-Native-IPA
           path: |
-            native-src/dist/Madeira.ipa
+            native-src/dist/AnkerPort-Native.ipa
             native-source-revision.txt
           retention-days: 7
