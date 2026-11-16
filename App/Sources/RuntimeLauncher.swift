@@ -41,7 +41,8 @@ enum RuntimeLauncher {
               executable.path.hasPrefix(game.path + "/") else {
             throw RuntimeLaunchError.outsideLibrary
         }
-        guard FileManager.default.fileExists(atPath: executable.path) else {
+        let values = try? executable.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+        guard values?.isRegularFile == true, values?.isSymbolicLink != true else {
             throw RuntimeLaunchError.noExecutable
         }
         let info = GameAnalyzer.inspectPE(url: executable, relative: executable.lastPathComponent)
