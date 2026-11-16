@@ -29,7 +29,7 @@ def probe_ios_object():
     with tempfile.TemporaryDirectory() as tmp:
         source_file = Path(tmp) / "probe.c"
         object_file = Path(tmp) / "probe.o"
-        source_file.write_text("int anker_ios_probe(void) { return 42; }\\n".replace("\\\\n", "\\n"))
+        source_file.write_text("int anker_ios_probe(void) { return 42; }" + chr(10))
         command = [clang, "-target", "arm64-apple-ios15.0", "-ffreestanding", "-c", str(source_file), "-o", str(object_file)]
         try:
             result = subprocess.run(command, capture_output=True, text=True, timeout=30)
