@@ -21,6 +21,8 @@ jobs:
       - name: Apply Anker Port product overlay before compilation
         run: |
           python3 runtime/tools/brand-upstream.py native-src
+          python3 runtime/tools/integrate-upstream.py native-src
+          grep -q 'ANKER_PORT_INTEGRATION_V1' native-src/app/Madeira/MadeiraApp.swift
           /usr/libexec/PlistBuddy -c 'Print CFBundleDisplayName' native-src/app/Madeira/Info.plist | grep -Fx 'Anker Port'
       - name: Build real Wine FEX DXMT runtime and iOS app
         working-directory: native-src
