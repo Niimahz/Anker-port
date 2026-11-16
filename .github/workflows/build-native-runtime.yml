@@ -1,6 +1,15 @@
 name: Compile real on-device Windows runtime
 on:
   workflow_dispatch:
+    inputs:
+      macos_runner:
+        description: 'macOS runner for IPA build (switch if one runner pool is unavailable)'
+        type: choice
+        required: true
+        default: macos-15
+        options:
+          - macos-15
+          - macos-15-intel
   push:
     branches: [main]
     paths:
@@ -55,7 +64,7 @@ jobs:
           retention-days: 14
   native-runtime:
     needs: preflight
-    runs-on: macos-15
+    runs-on: ${{ inputs.macos_runner || 'macos-15' }}
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
