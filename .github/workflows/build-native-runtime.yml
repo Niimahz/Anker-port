@@ -1,23 +1,11 @@
-name: Compile real on-device Windows runtime
+name: Prepare Anker native source on Linux
 on:
   workflow_dispatch:
-    inputs:
-      macos_runner:
-        description: 'macOS runner for IPA build (switch if one runner pool is unavailable)'
-        type: choice
-        required: true
-        default: macos-15
-        options:
-          - macos-15
-          - macos-15-intel
   push:
     branches: [main]
     paths:
       - '.github/workflows/build-native-runtime.yml'
-concurrency:
-  group: anker-native-runtime-${{ github.ref }}
-  cancel-in-progress: false
-
+      - 'runtime/tools/**'
 jobs:
   preflight:
     runs-on: ubuntu-latest
@@ -62,60 +50,35 @@ jobs:
             native-src/app/Madeira/MadeiraApp.swift
             native-src/app/Madeira/Info.plist
           retention-days: 14
-  native-runtime:
-    needs: preflight
-    runs-on: ${{ inputs.macos_runner || 'macos-15' }}
-    timeout-minutes: 360
+  linux-native-package:
+    needs: prepare-integrated-source
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
-      - name: Checkout GPL runtime source with native components
+      - name: Prepare actual upstream source tree
         run: |
-          git clone https://github.com/willfaust/Madeira.git native-src
+          git clone --filter=blob:none https://github.com/willfaust/Madeira.git native-src
           git -C native-src checkout fbad430410b4075192166172447c859714726de9
-          git -C native-src submodule update --init --recursive
-          git -C native-src rev-parse HEAD > native-source-revision.txt
-          cat native-source-revision.txt
-      - name: Apply Anker Port product overlay before compilation
-        run: |
           python3 runtime/tools/brand-upstream.py native-src
           python3 runtime/tools/integrate-upstream.py native-src
-          grep -q 'ANKER_PORT_INTEGRATION_V1' native-src/app/Madeira/MadeiraApp.swift
-          /usr/libexec/PlistBuddy -c 'Print CFBundleDisplayName' native-src/app/Madeira/Info.plist | grep -Fx 'Anker Port'
-      - name: Build real Wine FEX DXMT runtime and iOS app
-        working-directory: native-src
-        env:
-          JOBS: 4
+          swiftc -frontend -parse native-src/app/Madeira/MadeiraApp.swift
+          python3 - <<'PY'
+          from pathlib import Path
+          import plistlib
+          root = Path("native-src/app/Madeira")
+          assert "ANKER_PORT_INTEGRATION_V1" in (root / "MadeiraApp.swift").read_text()
+          with (root / "Info.plist").open("rb") as handle:
+              assert plistlib.load(handle)["CFBundleDisplayName"] == "Anker Port"
+          PY
+      - name: Package Linux-prepared native source (not an IPA)
         run: |
-          ./tools/build-ipa.sh
-      - name: Verify native IPA contains actual runtime
-        run: |
-          test -s native-src/dist/Madeira.ipa
-          unzip -tq native-src/dist/Madeira.ipa
-          unzip -l native-src/dist/Madeira.ipa | grep 'xtajit64.dll'
-          unzip -l native-src/dist/Madeira.ipa | grep 'prefix-template.tar.gz'
-      - name: Rename and validate Anker Port fork-derived IPA
-        run: |
-          cp native-src/dist/Madeira.ipa native-src/dist/AnkerPort-Native.ipa
-          unzip -tq native-src/dist/AnkerPort-Native.ipa
-          unzip -p native-src/dist/AnkerPort-Native.ipa Payload/Madeira.app/Info.plist > /tmp/anker-info.plist
-          /usr/libexec/PlistBuddy -c 'Print CFBundleDisplayName' /tmp/anker-info.plist | grep -Fx 'Anker Port'
-          python3 runtime/tools/verify-ipa.py native-src/dist/AnkerPort-Native.ipa --revision "$(cat native-source-revision.txt)"
-      - name: Preserve fork-derived Anker Port native IPA
-        uses: actions/upload-artifact@v4
+          tar -czf AnkerPort-Native-Source.tar.gz -C native-src app/Madeira/MadeiraApp.swift app/Madeira/Info.plist
+          sha256sum AnkerPort-Native-Source.tar.gz > AnkerPort-Native-Source.sha256
+      - uses: actions/upload-artifact@v4
         with:
-          name: AnkerPort-Native-IPA
+          name: AnkerPort-Linux-Native-Source
           path: |
-            native-src/dist/AnkerPort-Native.ipa
-            native-src/dist/AnkerPort-Native.manifest.json
-            native-source-revision.txt
-          retention-days: 7
-      - name: Stage reusable native libraries and guest runtime
-        run: |
-          bash runtime/tools/prepare-native.sh native-src runtime/staged
-          bash runtime/tools/verify-native.sh runtime/staged
-      - name: Upload native runtime development artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: anker-native-runtime-staged
-          path: runtime/staged/
-          retention-days: 7
+            AnkerPort-Native-Source.tar.gz
+            AnkerPort-Native-Source.sha256
+          retention-days: 14
