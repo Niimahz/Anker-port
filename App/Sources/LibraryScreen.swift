@@ -82,6 +82,7 @@ struct GameDetailScreen: View {
     let folder: URL
     @State private var report: GameReport?
     @State private var status = ""
+    @State private var selectedExecutable: String?
     var body: some View {
         List {
             Section("Game") {
@@ -94,17 +95,32 @@ struct GameDetailScreen: View {
             if let report {
                 Section("Executables") {
                     ForEach(report.executables.filter { $0.path.lowercased().hasSuffix(".exe") }) { file in
-                        VStack(alignment: .leading) {
-                            Text(file.path)
-                            Text(file.architecture).font(.caption).foregroundStyle(.secondary)
+                        Button {
+                            selectedExecutable = file.path
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(file.path)
+                                    Text(file.architecture).font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                if selectedExecutable == file.path { Image(systemName: "checkmark.circle.fill") }
+                            }
                         }
                     }
                 }
             }
             Section("Launcher") {
-                Text("Windows runtime not yet integrated. Launch is disabled until a real on-device runtime is compiled and tested.")
+                Text(RuntimeLauncher.isAvailable ? "Runtime ready" : "Native runtime is not linked in this build.")
                     .font(.caption)
-                Button("Launch game") {}.disabled(true)
+                Button("Launch game") {
+                    guard let selectedExecutable else { return }
+                    do {
+                        let request = RuntimeLaunchRequest(gameFolder: folder, executable: folder.appendingPathComponent(selectedExecutable), arguments: [], environment: [:])
+                        let result = try RuntimeLauncher.launch(request)
+                        status = result.diagnostic
+                    } catch { status = error.localizedDescription }
+                }.disabled(!RuntimeLauncher.isAvailable || selectedExecutable == nil)
             }
             if !status.isEmpty { Text(status) }
         }.navigationTitle("Game")
