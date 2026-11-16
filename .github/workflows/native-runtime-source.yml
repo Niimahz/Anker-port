@@ -1,0 +1,32 @@
+name: Inspect and prepare native runtime sources
+on:
+  workflow_dispatch:
+jobs:
+  provenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout upstream runtime source and exact nested components
+        run: |
+          git clone --filter=blob:none https://github.com/playportdev/playport.git upstream-runtime
+          git -C upstream-runtime rev-parse HEAD | tee runtime-source-commit.txt
+          git -C upstream-runtime submodule update --init upstream/madeira
+          git -C upstream-runtime/upstream/madeira rev-parse HEAD | tee -a runtime-source-commit.txt
+          test -f upstream-runtime/app/Sources/WineHost/include/wine_host.h
+          test -f upstream-runtime/app/Sources/WineHost/wine_host.c
+          test -f upstream-runtime/app/Package.swift
+          test -f upstream-runtime/LICENSE
+      - name: Compile Anker C adapter syntax against real upstream header
+        run: |
+          mkdir -p /tmp/anker-headers
+          cp upstream-runtime/app/Sources/WineHost/include/*.h /tmp/anker-headers/
+          cc -std=c11 -fsyntax-only -Iruntime/include -I/tmp/anker-headers runtime/anker_runtime.c
+      - name: Verify license and source pin
+        run: |
+          grep -q 'GNU GENERAL PUBLIC LICENSE' upstream-runtime/LICENSE
+          cat runtime-source-commit.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-runtime-source-provenance
+          path: runtime-source-commit.txt
