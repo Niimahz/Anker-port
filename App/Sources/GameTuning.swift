@@ -24,19 +24,27 @@ struct GameTuning: Codable, Equatable {
         // Backslash escapes quotes and spaces; malformed trailing escapes are literal.
         var output: [String] = [], current = ""
         var quote: Character?
-        var escaped = false
-        for char in launchArguments {
-            if escaped { current.append(char); escaped = false; continue }
-            if char == "\\" { escaped = true; continue }
-            if char == "\"" || char == "'" {
+        let characters = Array(launchArguments)
+        var index = 0
+        while index < characters.count {
+            let char = characters[index]
+            if char == "\\" && index + 1 < characters.count {
+                let next = characters[index + 1]
+                if next == "\\"" || next == "'" || next == "\\" || next.isWhitespace {
+                    current.append(next)
+                    index += 2
+                    continue
+                }
+            }
+            if char == "\\"" || char == "'" {
                 if quote == char { quote = nil }
                 else if quote == nil { quote = char }
                 else { current.append(char) }
             } else if char.isWhitespace && quote == nil {
                 if !current.isEmpty { output.append(current); current = "" }
             } else { current.append(char) }
+            index += 1
         }
-        if escaped { current.append("\\") }
         if !current.isEmpty { output.append(current) }
         return output
     }
