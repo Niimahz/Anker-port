@@ -72,7 +72,16 @@ jobs:
               assert plistlib.load(handle)["CFBundleDisplayName"] == "Anker Port"
           PY
       - name: Audit Linux iOS build feasibility
-        run: python3 runtime/tools/check-linux-ios-build.py native-src
+        run: |
+          python3 runtime/tools/check-linux-ios-build.py native-src
+          python3 - <<'PY'
+          import json
+          with open('AnkerPort-Linux-Build-Feasibility.json') as f:
+              result = json.load(f)
+          if not result['ios_arm64_object_probe']['supported']:
+              raise SystemExit('ARM64 iOS clang probe failed; see feasibility report')
+          print('PASS: Linux clang compiled a freestanding arm64-apple-ios object')
+          PY
       - name: Package Linux-prepared native source (not an IPA)
         run: |
           git -C native-src rev-parse HEAD > native-source-revision.txt
