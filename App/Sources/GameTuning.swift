@@ -30,13 +30,13 @@ struct GameTuning: Codable, Equatable {
             let char = characters[index]
             if char == "\\" && index + 1 < characters.count {
                 let next = characters[index + 1]
-                if next == "\\"" || next == "'" || next == "\\" || next.isWhitespace {
+                if next == "\"" || next == "'" || next == "\\" || next.isWhitespace {
                     current.append(next)
                     index += 2
                     continue
                 }
             }
-            if char == "\\"" || char == "'" {
+            if char == "\"" || char == "'" {
                 if quote == char { quote = nil }
                 else if quote == nil { quote = char }
                 else { current.append(char) }
