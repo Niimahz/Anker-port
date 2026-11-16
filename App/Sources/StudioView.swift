@@ -40,9 +40,9 @@ struct StudioView: View {
                         }
                     }
                     Section("Compatibility profile") {
-                        Picker("Runtime", selection: $runtime) {
+                        Picker("Compatibility engine", selection: $runtime) {
                             ForEach(RuntimeKind.allCases) { kind in
-                                Text(kind.rawValue).tag(kind)
+                                Text(kind == .madeira ? "Engine A" : "Engine B").tag(kind)
                             }
                         }
                         Button("Export untested profile JSON") { exportProfile() }
