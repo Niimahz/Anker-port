@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate Python overlay
-        run: python3 -m py_compile runtime/tools/brand-upstream.py
+        run: python3 -m py_compile runtime/tools/brand-upstream.py runtime/tools/integrate-upstream.py runtime/tools/verify-ipa.py
       - name: Test fork branding overlay and preserved runtime identifiers
         run: python3 -m unittest discover -s tests -p "test_*.py" -v
       - name: Validate shell syntax
