@@ -59,6 +59,22 @@ jobs:
         run: |
           git clone --filter=blob:none https://github.com/willfaust/Madeira.git native-src
           git -C native-src checkout fbad430410b4075192166172447c859714726de9
+      - name: Repair malformed StikJIT Swift module interfaces
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          folder = Path("native-src/app/Frameworks/StikJIT.xcframework/ios-arm64/StikJIT.framework/Modules/StikJIT.swiftmodule")
+          for name in ("arm64-apple-ios.swiftinterface", "arm64-apple-ios.private.swiftinterface"):
+              path = folder / name
+              source = path.read_text()
+              count = source.count("::")
+              if count != 108 or "Swift::Sendable" not in source:
+                  raise SystemExit(f"Unexpected StikJIT interface contents in {name}: {count} malformed separators")
+              updated = source.replace("::", ".")
+              path.write_text(updated)
+              assert "::" not in path.read_text()
+              print(f"Repaired {count} invalid Swift namespace separators in {name}")
+          PY
       - name: Integrate Anker with actual Madeira application
         run: |
           python3 runtime/tools/brand-upstream.py native-src
