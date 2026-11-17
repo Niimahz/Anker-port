@@ -233,6 +233,10 @@ private final class AnkerDownloadModel: ObservableObject {
                 return
             }
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            guard (try? FileManager.default.attributesOfItem(atPath: temporary.path)[.size] as? NSNumber)?.int64Value ?? 0 > 0 else {
+                status = "Downloaded file is empty."
+                return
+            }
             let candidate = response.suggestedFilename ?? url.lastPathComponent
             let name = URL(fileURLWithPath: candidate).lastPathComponent
             let safeName = name.isEmpty || name == "/" ? "download.bin" : name
