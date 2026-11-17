@@ -6,6 +6,9 @@ on:
       - 'App/Sources/**'
       - 'runtime/**'
       - '.github/workflows/source-lint.yml'
+      - '.github/workflows/build-native-runtime.yml'
+      - '.github/workflows/native-runtime-source.yml'
+      - 'tests/**'
   workflow_dispatch:
 jobs:
   syntax:
