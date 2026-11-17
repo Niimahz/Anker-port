@@ -1,31 +1,47 @@
-name: Verify original Madeira IPA baseline (no rebuild)
+name: Build Anker Port IPA on macOS
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'runtime/tools/integrate-upstream.py'
+      - 'runtime/tools/brand-upstream.py'
+      - '.github/workflows/build-ipa.yml'
 permissions:
   contents: read
+concurrency:
+  group: anker-ipa-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  verify-upstream-ipa:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+  build:
+    runs-on: macos-15
+    timeout-minutes: 360
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+      CONFIGURATION: Debug
     steps:
       - uses: actions/checkout@v4
-      - name: Download original published Madeira IPA and checksum
+      - name: Fetch pinned Madeira source
+        run: |
+          git clone --filter=blob:none https://github.com/willfaust/Madeira.git native-src
+          git -C native-src checkout fbad430410b4075192166172447c859714726de9
+      - name: Integrate Anker with actual Madeira application
+        run: |
+          python3 runtime/tools/brand-upstream.py native-src
+          python3 runtime/tools/integrate-upstream.py native-src
+          xcrun swiftc -frontend -parse native-src/app/Madeira/MadeiraApp.swift
+      - name: Build using upstream Madeira toolchain
+        run: |
+          cd native-src
+          bash tools/build-ipa.sh
+      - name: Verify and package user-signable IPA
         run: |
           mkdir -p dist
-          curl -fL --retry 3 -o dist/Madeira-0.2.0.ipa https://github.com/willfaust/Madeira/releases/download/v0.2.0/Madeira-0.2.0.ipa
-          curl -fL --retry 3 -o dist/Madeira-0.2.0.ipa.sha256 https://github.com/willfaust/Madeira/releases/download/v0.2.0/Madeira-0.2.0.ipa.sha256
-      - name: Verify original file integrity and native runtime resources
-        run: |
-          cd dist
-          sha256sum -c Madeira-0.2.0.ipa.sha256
-          unzip -tq Madeira-0.2.0.ipa
-          unzip -l Madeira-0.2.0.ipa | grep -q 'Payload/.*\.app/'
-          echo 'Verified original Madeira binary; this is NOT an Anker-integrated IPA.'
-      - name: Upload unchanged upstream IPA for comparison
-        uses: actions/upload-artifact@v4
+          cp native-src/dist/Madeira.ipa dist/AnkerPort-unsigned.ipa
+          python3 runtime/tools/verify-ipa.py dist/AnkerPort-unsigned.ipa
+          shasum -a 256 dist/AnkerPort-unsigned.ipa > dist/SHA256SUMS
+      - uses: actions/upload-artifact@v4
         with:
-          name: Original-Madeira-v0.2.0-IPA
-          path: |
-            dist/Madeira-0.2.0.ipa
-            dist/Madeira-0.2.0.ipa.sha256
+          name: AnkerPort-Unsigned-IPA
+          path: dist/
           retention-days: 14
