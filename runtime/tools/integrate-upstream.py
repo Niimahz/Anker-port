@@ -8,7 +8,7 @@ if len(sys.argv) != 2:
 source = Path(sys.argv[1]) / "app/Madeira/MadeiraApp.swift"
 original = source.read_text()
 if "import UniformTypeIdentifiers" not in original:
-    original = "import UniformTypeIdentifiers\\n" + original
+    original = "import UniformTypeIdentifiers\n" + original
 marker = "            ContentView()\n"
 assert marker in original or "// ANKER_PORT_INTEGRATION_V1" in original, "upstream entry point changed"
 if "// ANKER_PORT_INTEGRATION_V1" in original:
