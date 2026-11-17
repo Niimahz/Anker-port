@@ -30,6 +30,25 @@ jobs:
           python3 runtime/tools/brand-upstream.py native-src
           python3 runtime/tools/integrate-upstream.py native-src
           xcrun swiftc -frontend -parse native-src/app/Madeira/MadeiraApp.swift
+      - name: Patch pinned DXMT Metal atomic API compatibility
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("native-src/dxmt/src/airconv/shaders/air_tessellation.metal")
+          original = p.read_text()
+          old = "__metal_atomic_fetch_add_explicit(out_count, 1, int(memory_order_relaxed), __METAL_MEMORY_SCOPE_THREADGROUP__, __METAL_MEMORY_FLAGS_NONE__)"
+          new = "__metal_atomic_fetch_add_explicit(out_count, 1, int(memory_order_relaxed), __METAL_MEMORY_SCOPE_THREADGROUP__)"
+          if old in original:
+              assert original.count(old) == 1, "Unexpected duplicate atomic calls"
+              p.write_text(original.replace(old, new))
+              print("Patched DXMT 5-argument atomic call to 4-argument Metal API")
+          elif new in original:
+              print("DXMT already uses 4-argument atomic call")
+          else:
+              raise SystemExit("DXMT atomic call changed upstream: refusing unsafe patch")
+          updated = p.read_text()
+          assert old not in updated and new in updated, "DXMT patch verification failed"
+          PY
       - name: Build using upstream Madeira toolchain
         run: |
           cd native-src
