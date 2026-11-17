@@ -70,6 +70,10 @@ jobs:
           assert "Pass it when the toolchain defines it" not in script.read_text()
           print("Disabled upstream Xcode 27 shader rewrite for macos-15")
           PY
+      - name: Initialize FEX submodule before restoring its build cache
+        run: |
+          git -C native-src submodule update --init --depth 1 FEX
+          test -f native-src/FEX/CMakeLists.txt
       - name: Restore compiled LLVM iOS libraries
         id: llvm-cache
         uses: actions/cache/restore@v4
