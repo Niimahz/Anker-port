@@ -58,6 +58,11 @@ private final class AnkerDownloadModel: ObservableObject {
     @Published var saved: URL?
     @Published var files: [URL] = []
     @Published var executableCandidates: [URL] = []
+    @Published var steamQuery = ""
+    @Published var steamGames: [AnkerSteamGame] = []
+    @Published var steamError = ""
+    @Published var steamBusy = false
+
 
     private var directory: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -166,6 +171,29 @@ private final class AnkerDownloadModel: ObservableObject {
         }
     }
 
+    func searchSteam() async {
+        let query = steamQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty, !steamBusy else { return }
+        steamBusy = true
+        defer { steamBusy = false }
+        var parts = URLComponents(string: "https://store.steampowered.com/api/storesearch/")
+        parts?.queryItems = [URLQueryItem(name: "term", value: query),
+                             URLQueryItem(name: "l", value: "english"),
+                             URLQueryItem(name: "cc", value: "us")]
+        guard let url = parts?.url else { return }
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                throw URLError(.badServerResponse)
+            }
+            steamGames = try JSONDecoder().decode(AnkerSteamResponse.self, from: data).items
+            steamError = ""
+        } catch {
+            steamGames = []
+            steamError = error.localizedDescription
+        }
+    }
+
     func download() async {
         guard !busy, let url = validatedURL else { return }
         busy = true
@@ -190,6 +218,15 @@ private final class AnkerDownloadModel: ObservableObject {
             status = "Download failed: " + error.localizedDescription
         }
     }
+}
+
+private struct AnkerSteamResponse: Decodable {
+    let items: [AnkerSteamGame]
+}
+
+private struct AnkerSteamGame: Decodable, Identifiable {
+    let id: Int
+    let name: String
 }
 
 private struct AnkerNativeDownloads: View {
@@ -334,7 +371,24 @@ private struct AnkerNativeDownloads: View {
 
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Label("Downloaded files", systemImage: "folder.fill")
+                        Label("Steam lookup", systemImage: "magnifyingglass")
+                        .font(.headline)
+                    TextField("Find a game on Steam", text: $model.steamQuery)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    Button("Search Steam") { Task { await model.searchSteam() } }
+                        .disabled(model.steamBusy || model.steamQuery.isEmpty)
+                    if model.steamBusy { ProgressView() }
+                    if !model.steamError.isEmpty {
+                        Text(model.steamError).font(.caption).foregroundStyle(.red)
+                    }
+                    ForEach(model.steamGames) { game in
+                        if let url = URL(string: "https://store.steampowered.com/app/\\(game.id)/") {
+                            Link(game.name, destination: url)
+                        }
+                    }
+                    Divider()
+                    Label("Downloaded files", systemImage: "folder.fill")
                             .font(.headline)
                         Spacer()
                         Text("\(model.files.count)")
