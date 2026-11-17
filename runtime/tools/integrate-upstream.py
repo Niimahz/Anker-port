@@ -399,6 +399,10 @@ private struct AnkerNativeDownloads: View {
                     .accessibilityIdentifier("anker.downloads.start")
                     Text(model.status)
                         .font(.footnote)
+                    if model.expectedBytes > 0 {
+                        Text("Expected: " + ByteCountFormatter.string(fromByteCount: model.expectedBytes, countStyle: .file))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     if model.downloadedBytes > 0 {
                         Text(ByteCountFormatter.string(fromByteCount: model.downloadedBytes, countStyle: .file))
                             .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
@@ -423,7 +427,8 @@ private struct AnkerNativeDownloads: View {
                     }
                     .disabled(model.busy)
                     if !model.executableCandidates.isEmpty {
-                        Text("Choose the game EXE").font(.subheadline.weight(.semibold))
+                        Text("Choose the game EXE (" + String(model.executableCandidates.count) + ")")
+                            .font(.subheadline.weight(.semibold))
                         ForEach(model.executableCandidates, id: \.path) { executable in
                             Button {
                                 model.selectImportedExecutable(executable)
@@ -438,6 +443,8 @@ private struct AnkerNativeDownloads: View {
                     }
                     if model.configExecutable != nil {
                         Text("Game settings (local JSON)").font(.headline)
+                        Text("Saved settings do not yet change the Madeira game launch.")
+                            .font(.caption).foregroundStyle(.secondary)
                         TextEditor(text: $model.configText)
                             .accessibilityIdentifier("anker.config.editor")
                             .font(.system(.caption, design: .monospaced))
@@ -471,6 +478,10 @@ private struct AnkerNativeDownloads: View {
                         }
                         if !model.steamBusy && model.steamError.isEmpty && !model.steamQuery.isEmpty && model.steamGames.isEmpty {
                             Text("No Steam results loaded. Tap Search Steam.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        if !model.steamGames.isEmpty {
+                            Text(String(model.steamGames.count) + " Steam results")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         ForEach(model.steamGames) { game in
