@@ -82,8 +82,22 @@ jobs:
               raise SystemExit('ARM64 iOS clang probe failed; see feasibility report')
           print('PASS: Linux clang compiled a freestanding arm64-apple-ios object')
           PY
+      - name: Install LLVM Mach-O linker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lld
+          command -v ld64.lld || find /usr/lib/llvm-* -name ld64.lld -type f -print
       - name: Probe Linux Mach-O iOS linking tools
-        run: python3 runtime/tools/probe-ios-link.py
+        run: |
+          python3 runtime/tools/probe-ios-link.py
+          python3 - <<'PY'
+          import json
+          with open('AnkerPort-iOS-Link-Probe.json') as f:
+              result = json.load(f)
+          if not result['ios_arm64_macho_linked']:
+              raise SystemExit('Mach-O linking failed; see probe diagnostics')
+          print('PASS: Linux linked freestanding arm64 iOS Mach-O')
+          PY
       - name: Package Linux-prepared native source (not an IPA)
         run: |
           git -C native-src rev-parse HEAD > native-source-revision.txt
