@@ -61,6 +61,31 @@ jobs:
         run: |
           git clone --filter=blob:none https://github.com/willfaust/Madeira.git native-src
           git -C native-src checkout fbad430410b4075192166172447c859714726de9
+      - name: Prepare Rust iOS dependencies with network retries
+        timeout-minutes: 10
+        env:
+          CARGO_NET_RETRY: "5"
+          CARGO_HTTP_TIMEOUT: "120"
+        run: |
+          set -euo pipefail
+          retry_download() {
+            local attempt
+            for attempt in 1 2 3 4 5; do
+              if "$@"; then
+                return 0
+              fi
+              if [ "$attempt" -lt 5 ]; then
+                echo "::warning::Dependency download attempt $attempt failed; retrying."
+                sleep "$((attempt * 5))"
+              fi
+            done
+            echo "::error::Dependency download failed after five attempts."
+            return 1
+          }
+          rustc --version
+          retry_download rustup target add aarch64-apple-ios
+          rustup target list --installed | grep -Fx aarch64-apple-ios
+          retry_download cargo fetch --locked --manifest-path native-src/build/rppairing-ios/Cargo.toml --target aarch64-apple-ios
       - name: Enable ARM64 Wine system programs on Intel build hosts
         run: |
           python3 - <<'PYCODE'
