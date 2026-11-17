@@ -32,6 +32,7 @@ jobs:
           xcrun swiftc -frontend -parse native-src/app/Madeira/MadeiraApp.swift
       - name: Patch pinned DXMT Metal atomic API compatibility
         run: |
+          git -C native-src submodule update --init dxmt
           python3 - <<'PY'
           from pathlib import Path
           p = Path("native-src/dxmt/src/airconv/shaders/air_tessellation.metal")
