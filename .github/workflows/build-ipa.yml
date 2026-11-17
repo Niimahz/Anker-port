@@ -21,6 +21,30 @@ jobs:
       CONFIGURATION: Debug
     steps:
       - uses: actions/checkout@v4
+      - name: Validate MetalFX frame interpolation SDK before expensive build
+        run: |
+          set -euo pipefail
+          echo "Runner: $(sw_vers -productVersion)"
+          echo "Active Xcode: $(xcode-select -p)"
+          xcodebuild -version
+          echo "Checking installed Xcode SDKs for the MetalFX frame interpolation API"
+          selected=""
+          for developer in /Applications/Xcode*.app/Contents/Developer; do
+            [ -d "$developer" ] || continue
+            sdk="$developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk"
+            [ -d "$sdk" ] || continue
+            if grep -R -l -q 'MTLFXFrameInterpolatorDescriptor' "$sdk/System/Library/Frameworks/MetalFX.framework/Headers" 2>/dev/null; then
+              selected="$developer"
+              break
+            fi
+          done
+          if [ -z "$selected" ]; then
+            echo "::error::No installed iPhoneOS SDK declares MTLFXFrameInterpolatorDescriptor. The pinned DXMT source requires this API; do not spend hours compiling against an incompatible SDK."
+            exit 1
+          fi
+          echo "Selected compatible Xcode: $selected"
+          echo "DEVELOPER_DIR=$selected" >> "$GITHUB_ENV"
+          DEVELOPER_DIR="$selected" xcrun --sdk iphoneos --show-sdk-version
       - name: Fetch pinned Madeira source
         run: |
           git clone --filter=blob:none https://github.com/willfaust/Madeira.git native-src
