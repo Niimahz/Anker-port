@@ -6,6 +6,7 @@ on:
     paths:
       - 'runtime/tools/integrate-upstream.py'
       - 'runtime/tools/brand-upstream.py'
+      - 'runtime/tools/verify-ipa.py'
       - '.github/workflows/build-ipa.yml'
 permissions:
   contents: read
