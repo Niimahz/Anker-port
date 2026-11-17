@@ -15,7 +15,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
-    runs-on: macos-latest
+    # Avoid the ARM64 hosted pool that failed to allocate a runner.
+    runs-on: macos-15-intel
     timeout-minutes: 360
     env:
       HOMEBREW_NO_AUTO_UPDATE: "1"
