@@ -143,6 +143,10 @@ private final class AnkerDownloadModel: ObservableObject {
                     includingPropertiesForKeys: [.isRegularFileKey],
                     options: [.skipsHiddenFiles]) {
                 while let file = walker.nextObject() as? URL {
+                    if (try? file.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true {
+                        walker.skipDescendants()
+                        continue
+                    }
                     if file.pathExtension.lowercased() == "exe" {
                         candidates.append(file)
                         if candidates.count > 500 { break }
