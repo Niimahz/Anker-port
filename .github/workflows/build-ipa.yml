@@ -50,6 +50,26 @@ jobs:
           updated = p.read_text()
           assert old not in updated and new in updated, "DXMT patch verification failed"
           PY
+          python3 - <<'PY'
+          from pathlib import Path
+          script = Path("native-src/tools/build/build-shader-headers.sh")
+          source = script.read_text()
+          begin = source.index("# Metal toolchain 32023")
+          end = source.index('for name in "${SHADERS[@]}"; do', begin)
+          replacement = """# Anker compatibility: macos-15 Metal compiler expects exactly four atomic arguments.
+# Do not rewrite the pinned DXMT shader back to the five-argument Xcode 27 form.
+test -f "$SRC/air_tessellation.metal"
+grep -Fq '__metal_atomic_fetch_add_explicit(out_count, 1, int(memory_order_relaxed), __METAL_MEMORY_SCOPE_THREADGROUP__);' "$SRC/air_tessellation.metal"
+if grep -Fq '__METAL_MEMORY_FLAGS_NONE__);' "$SRC/air_tessellation.metal"; then
+  echo "ERROR: DXMT shader has incompatible five-argument atomic call" >&2
+  exit 1
+fi
+
+"""
+          script.write_text(source[:begin] + replacement + source[end:])
+          assert "Pass it when the toolchain defines it" not in script.read_text()
+          print("Disabled upstream Xcode 27 shader rewrite for macos-15")
+          PY
       - name: Restore compiled LLVM iOS libraries
         id: llvm-cache
         uses: actions/cache/restore@v4
