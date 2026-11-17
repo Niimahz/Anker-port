@@ -7,6 +7,8 @@ if len(sys.argv) != 2:
     raise SystemExit("usage: integrate-upstream.py UPSTREAM_ROOT")
 source = Path(sys.argv[1]) / "app/Madeira/MadeiraApp.swift"
 original = source.read_text()
+if "import UniformTypeIdentifiers" not in original:
+    original = "import UniformTypeIdentifiers\\n" + original
 marker = "            ContentView()\n"
 assert marker in original or "// ANKER_PORT_INTEGRATION_V1" in original, "upstream entry point changed"
 if "// ANKER_PORT_INTEGRATION_V1" in original:
@@ -77,9 +79,7 @@ private final class AnkerDownloadModel: ObservableObject {
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending } ?? []
     }
 
-    // Bridge to Madeira's actual Wine library, not a parallel Anker-only database.
-    // Only stand-alone PE executables can be staged this way; games needing DLLs
-    // must be installed with their full directory under drive_c.
+    // Reuse Madeira's PE inspector and native library persistence.
     func registerExecutable(_ file: URL) {
         guard !busy else { return }
         guard file.pathExtension.lowercased() == "exe" else {
@@ -87,41 +87,63 @@ private final class AnkerDownloadModel: ObservableObject {
             return
         }
         do {
-            let data = try Data(contentsOf: file, options: .mappedIfSafe)
-            guard data.count >= 0x40, data[0] == 0x4d, data[1] == 0x5a else {
-                status = "This file is not a Windows PE executable."
-                return
-            }
-            let peOffset = Int(data[0x3c]) | Int(data[0x3d]) << 8
-                | Int(data[0x3e]) << 16 | Int(data[0x3f]) << 24
-            guard peOffset >= 0, peOffset + 26 <= data.count,
-                  data[peOffset] == 0x50, data[peOffset + 1] == 0x45,
-                  data[peOffset + 2] == 0, data[peOffset + 3] == 0 else {
-                status = "Invalid Windows PE header."
-                return
-            }
-            let machine = Int(data[peOffset + 4]) | Int(data[peOffset + 5]) << 8
-            let bits: Int
-            switch machine {
-            case 0x014c: bits = 32
-            case 0x8664: bits = 64
-            default:
-                status = "Unsupported Windows executable architecture."
-                return
-            }
-            let drive = LibraryModel.drive
-            let targetFolder = drive.appendingPathComponent("Games/AnkerImports", isDirectory: true)
+            let targetFolder = LibraryModel.drive.appendingPathComponent("Games/AnkerImports", isDirectory: true)
             try FileManager.default.createDirectory(at: targetFolder, withIntermediateDirectories: true)
-            let targetName = UUID().uuidString + "-" + file.lastPathComponent
-            let target = targetFolder.appendingPathComponent(targetName)
+            let target = targetFolder.appendingPathComponent(UUID().uuidString + "-" + file.lastPathComponent)
             try FileManager.default.copyItem(at: file, to: target)
-            let relative = "Games/AnkerImports/" + targetName
-            let entry = LibraryEntry(title: file.deletingPathExtension().lastPathComponent,
-                                     relativePath: relative, bits: bits)
-            LibraryModel.shared.save(entry)
-            status = "Added to Madeira library. Launch it from the Games tab."
+            do {
+                LibraryModel.shared.save(try LibraryModel.inspect(target))
+                status = "Added to Madeira library. Launch it from the Games tab."
+            } catch {
+                try? FileManager.default.removeItem(at: target)
+                throw error
+            }
         } catch {
             status = "Library import failed: " + error.localizedDescription
+        }
+    }
+
+    // Preserve full installed game directory, DLLs and asset paths.
+    func importGameFolder(_ source: URL) {
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        let accessed = source.startAccessingSecurityScopedResource()
+        defer { if accessed { source.stopAccessingSecurityScopedResource() } }
+        do {
+            var isDirectory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: source.path, isDirectory: &isDirectory),
+                  isDirectory.boolValue else {
+                status = "Select an extracted game folder."
+                return
+            }
+            let destination = LibraryModel.drive
+                .appendingPathComponent("Games/AnkerImports", isDirectory: true)
+                .appendingPathComponent(UUID().uuidString + "-" + source.lastPathComponent, isDirectory: true)
+            try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(),
+                                                    withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: source, to: destination)
+            var candidates: [URL] = []
+            if let walker = FileManager.default.enumerator(at: destination,
+                    includingPropertiesForKeys: [.isRegularFileKey],
+                    options: [.skipsHiddenFiles]) {
+                while let file = walker.nextObject() as? URL {
+                    if file.pathExtension.lowercased() == "exe" {
+                        candidates.append(file)
+                        if candidates.count > 500 { break }
+                    }
+                }
+            }
+            if candidates.count == 1, let executable = candidates.first {
+                LibraryModel.shared.save(try LibraryModel.inspect(executable))
+                status = "Game folder imported and executable registered in Madeira."
+            } else if candidates.isEmpty {
+                status = "Folder copied to Wine drive_c, but no EXE was found."
+            } else {
+                status = "Folder copied with multiple EXE files. Select the main EXE in Madeira's Add Game picker."
+            }
+        } catch {
+            status = "Game folder import failed: " + error.localizedDescription
         }
     }
 
@@ -153,6 +175,7 @@ private final class AnkerDownloadModel: ObservableObject {
 
 private struct AnkerNativeDownloads: View {
     @StateObject private var model = AnkerDownloadModel()
+    @State private var selectingGameFolder = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -222,6 +245,22 @@ private struct AnkerNativeDownloads: View {
                 .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
 
                 VStack(alignment: .leading, spacing: 12) {
+                    Label("Installed game folder", systemImage: "folder.badge.plus")
+                        .font(.headline)
+                    Button {
+                        selectingGameFolder = true
+                    } label: {
+                        Label("Import extracted game folder", systemImage: "square.and.arrow.down.on.square")
+                    }
+                    .disabled(model.busy)
+                    Text("Copies the complete folder into Madeira's Wine drive, preserving DLLs and assets.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(18)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+
+                VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Label("Downloaded files", systemImage: "folder.fill")
                             .font(.headline)
@@ -286,6 +325,16 @@ private struct AnkerNativeDownloads: View {
             }
         }
         .onAppear { model.refresh() }
+        .fileImporter(isPresented: $selectingGameFolder,
+                      allowedContentTypes: [.folder],
+                      allowsMultipleSelection: false) { result in
+            switch result {
+            case .success(let urls):
+                if let folder = urls.first { model.importGameFolder(folder) }
+            case .failure(let error):
+                model.status = "Folder picker failed: " + error.localizedDescription
+            }
+        }
     }
 }
 '''
