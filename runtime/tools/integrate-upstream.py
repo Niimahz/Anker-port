@@ -176,6 +176,8 @@ private final class AnkerDownloadModel: ObservableObject {
 private struct AnkerNativeDownloads: View {
     @StateObject private var model = AnkerDownloadModel()
     @State private var selectingGameFolder = false
+    @ObservedObject private var jit = JITCoordinator.shared
+    @ObservedObject private var library = LibraryModel.shared
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -200,6 +202,45 @@ private struct AnkerNativeDownloads: View {
                                    startPoint: .topLeading, endPoint: .bottomTrailing),
                     in: RoundedRectangle(cornerRadius: 22)
                 )
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Label("Madeira runtime", systemImage: "cpu")
+                        .font(.headline)
+                    HStack {
+                        Text("Windows game library")
+                        Spacer()
+                        Text(String(library.entries.count) + " entries")
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Text("JIT method")
+                        Spacer()
+                        Text(jit.resolvedMethod.title)
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Text("JIT status")
+                        Spacer()
+                        Text(jit.busy ? "Connecting…" : (jit.status ?? (jit.error == nil ? "Not checked" : "Needs attention")))
+                            .foregroundStyle(jit.error == nil ? .secondary : .red)
+                            .lineLimit(2)
+                    }
+                    if let error = jit.error {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                    if let error = library.error {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                    Text("Game launches and JIT activation remain managed by Madeira.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(18)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
 
                 VStack(alignment: .leading, spacing: 14) {
                     Label("New download", systemImage: "arrow.down.circle.fill")
