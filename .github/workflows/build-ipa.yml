@@ -1,22 +1,51 @@
-name: Validate Anker Port Studio source on Linux
+name: Build unsigned Anker Port IPA on macOS
 on:
   workflow_dispatch:
-  push:
+  workflow_run:
+    workflows: ["Inspect and prepare native runtime sources"]
+    types: [completed]
     branches: [main]
-    paths:
-      - 'App/**'
-      - '.github/workflows/build-ipa.yml'
+permissions:
+  contents: read
 jobs:
-  validate:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+  macos-ipa:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: macos-15
+    timeout-minutes: 360
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+      CONFIGURATION: Debug
     steps:
-      - uses: actions/checkout@v4
-      - name: Parse Swift app sources on Linux
-        run: find App/Sources -name '*.swift' -print0 | xargs -0 swiftc -frontend -parse
-      - name: Verify app project specification
+      - name: Checkout Anker integration at verified commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+      - name: Checkout pinned Madeira runtime
         run: |
-          test -s App/project.yml
-          test -d App/Sources
-      - name: Report artifact type
-        run: echo 'Linux source validation only. No IPA is produced by this workflow.'
+          git clone --filter=blob:none https://github.com/willfaust/Madeira.git native-src
+          git -C native-src checkout fbad430410b4075192166172447c859714726de9
+      - name: Apply Anker source integration
+        run: |
+          python3 runtime/tools/brand-upstream.py native-src
+          python3 runtime/tools/integrate-upstream.py native-src
+          xcrun swiftc -frontend -parse native-src/app/Madeira/MadeiraApp.swift
+      - name: Build Madeira native runtime and IPA without developer signing
+        run: |
+          cd native-src
+          bash tools/build-ipa.sh
+      - name: Rename IPA and validate contents
+        run: |
+          test -s native-src/dist/Madeira.ipa
+          mkdir -p dist
+          cp native-src/dist/Madeira.ipa dist/AnkerPort-unsigned.ipa
+          unzip -tq dist/AnkerPort-unsigned.ipa
+          python3 runtime/tools/verify-ipa.py dist/AnkerPort-unsigned.ipa
+          shasum -a 256 dist/AnkerPort-unsigned.ipa > dist/SHA256SUMS
+      - name: Upload IPA for user-side signing
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnkerPort-Unsigned-IPA
+          path: |
+            dist/AnkerPort-unsigned.ipa
+            dist/SHA256SUMS
+          retention-days: 14
