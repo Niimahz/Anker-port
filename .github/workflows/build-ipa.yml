@@ -50,40 +50,74 @@ jobs:
           updated = p.read_text()
           assert old not in updated and new in updated, "DXMT patch verification failed"
           PY
-      - name: Restore reusable Madeira native libraries
-        id: native-cache
+      - name: Restore compiled LLVM iOS libraries
+        id: llvm-cache
         uses: actions/cache/restore@v4
         with:
-          key: madeira-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('native-src/tools/build/build-llvm-ios.sh', 'native-src/tools/build/build-fex-ios.sh', 'native-src/tools/build/build-dxmt-ios.sh', 'native-src/tools/build/build-shader-headers.sh', 'native-src/.gitmodules') }}-xcode27
+          key: anker-llvm-v1-macos15-fbad4304-${{ hashFiles('native-src/tools/build/build-llvm-ios.sh') }}
           path: |
             native-src/toolchains/llvm-ios-build/.madeira-cache.sha256
             native-src/toolchains/llvm-ios-build/lib
             native-src/toolchains/llvm-ios-build/include
             native-src/toolchains/llvm-project/llvm/include
-            native-src/FEX/build-ios
-            native-src/app/Madeira/libdxmt_combined.a
-      - name: Check restored native library cache
-        run: |
-          if [ -s native-src/toolchains/llvm-ios-build/.madeira-cache.sha256 ]; then
-            (cd native-src/toolchains/llvm-ios-build && shasum -a 256 -c .madeira-cache.sha256)
-          fi
+      - name: Restore compiled FEX iOS libraries
+        id: fex-cache
+        uses: actions/cache/restore@v4
+        with:
+          key: anker-fex-v1-macos15-fbad4304-${{ hashFiles('native-src/tools/build/build-fex-ios.sh') }}
+          path: native-src/FEX/build-ios
+      - name: Restore compiled DXMT iOS library
+        id: dxmt-cache
+        uses: actions/cache/restore@v4
+        with:
+          key: anker-dxmt-v2-macos15-fbad4304-atomic4-${{ hashFiles('native-src/tools/build/build-dxmt-ios.sh', 'native-src/tools/build/build-shader-headers.sh') }}
+          path: native-src/app/Madeira/libdxmt_combined.a
       - name: Build using upstream Madeira toolchain
         run: |
           cd native-src
           bash tools/build-ipa.sh
-      - name: Save completed native libraries even if packaging fails
-        if: always() && steps.native-cache.outputs.cache-hit != 'true'
-        continue-on-error: true
+      - name: Check reusable libraries produced by the build
+        if: always()
+        id: cache-check
+        run: |
+          if [ -s native-src/toolchains/llvm-ios-build/.madeira-cache.sha256 ] &&
+             [ -s native-src/toolchains/llvm-ios-build/lib/libLLVMCore.a ] &&
+             [ -s native-src/toolchains/llvm-ios-build/lib/libLLVMSupport.a ] &&
+             [ -f native-src/toolchains/llvm-project/llvm/include/llvm/IR/Module.h ] &&
+             (cd native-src/toolchains/llvm-ios-build && shasum -a 256 -c .madeira-cache.sha256 >/dev/null); then
+            echo "llvm=true" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -s native-src/FEX/build-ios/FEXCore/Source/libFEXCore.a ] &&
+             [ -s native-src/FEX/build-ios/FEXCore/Source/libFEXCore_Base.a ] &&
+             [ -s native-src/FEX/build-ios/External/fmt/libfmt.a ] &&
+             [ -s native-src/FEX/build-ios/External/cephes/libcephes_128bit.a ]; then
+            echo "fex=true" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -s native-src/app/Madeira/libdxmt_combined.a ]; then
+            echo "dxmt=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Cache completed LLVM libraries even if another component fails
+        if: always() && steps.cache-check.outputs.llvm == 'true' && steps.llvm-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          key: madeira-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('native-src/tools/build/build-llvm-ios.sh', 'native-src/tools/build/build-fex-ios.sh', 'native-src/tools/build/build-dxmt-ios.sh', 'native-src/tools/build/build-shader-headers.sh', 'native-src/.gitmodules') }}-xcode27
+          key: anker-llvm-v1-macos15-fbad4304-${{ hashFiles('native-src/tools/build/build-llvm-ios.sh') }}
           path: |
             native-src/toolchains/llvm-ios-build/.madeira-cache.sha256
             native-src/toolchains/llvm-ios-build/lib
             native-src/toolchains/llvm-ios-build/include
             native-src/toolchains/llvm-project/llvm/include
-            native-src/FEX/build-ios
-            native-src/app/Madeira/libdxmt_combined.a
+      - name: Cache completed FEX libraries even if another component fails
+        if: always() && steps.cache-check.outputs.fex == 'true' && steps.fex-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          key: anker-fex-v1-macos15-fbad4304-${{ hashFiles('native-src/tools/build/build-fex-ios.sh') }}
+          path: native-src/FEX/build-ios
+      - name: Cache completed DXMT library
+        if: always() && steps.cache-check.outputs.dxmt == 'true' && steps.dxmt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          key: anker-dxmt-v2-macos15-fbad4304-atomic4-${{ hashFiles('native-src/tools/build/build-dxmt-ios.sh', 'native-src/tools/build/build-shader-headers.sh') }}
+          path: native-src/app/Madeira/libdxmt_combined.a
       - name: Verify and package user-signable IPA
         run: |
           mkdir -p dist
