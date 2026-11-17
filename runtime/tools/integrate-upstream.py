@@ -147,7 +147,8 @@ private final class AnkerDownloadModel: ObservableObject {
             } else if candidates.isEmpty {
                 status = "Folder copied to Wine drive_c, but no EXE was found."
             } else {
-                status = "Folder copied with multiple EXE files. Select the main EXE in Madeira's Add Game picker."
+                executableCandidates = candidates.sorted { $0.lastPathComponent < $1.lastPathComponent }
+                status = "Folder imported. Choose the main game EXE below."
             }
         } catch {
             status = "Game folder import failed: " + error.localizedDescription
@@ -312,6 +313,18 @@ private struct AnkerNativeDownloads: View {
                         Label("Import extracted game folder", systemImage: "square.and.arrow.down.on.square")
                     }
                     .disabled(model.busy)
+                    if !model.executableCandidates.isEmpty {
+                        Text("Choose the game EXE").font(.subheadline.weight(.semibold))
+                        ForEach(model.executableCandidates, id: \.path) { executable in
+                            Button {
+                                model.selectImportedExecutable(executable)
+                            } label: {
+                                Label(executable.lastPathComponent, systemImage: "gamecontroller.fill")
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                    }
                     Text("Copies the complete folder into Madeira's Wine drive, preserving DLLs and assets.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
