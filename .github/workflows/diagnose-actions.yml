@@ -1,0 +1,21 @@
+name: Diagnose GitHub Actions scheduling
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/diagnose-actions.yml'
+permissions:
+  contents: read
+jobs:
+  ubuntu-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Report runner
+        run: echo "Ubuntu runner allocated"; uname -a
+  macos-probe:
+    runs-on: macos-latest
+    timeout-minutes: 5
+    steps:
+      - name: Report runner
+        run: echo "macOS runner allocated"; sw_vers; xcodebuild -version
