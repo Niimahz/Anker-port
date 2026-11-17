@@ -455,6 +455,7 @@ private struct AnkerNativeDownloads: View {
                         Text(model.configStatus).font(.caption)
                     }
                     Text("Copies the complete folder into Madeira's Wine drive, preserving DLLs and assets.")
+                        .accessibilityIdentifier("anker.import.description")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
