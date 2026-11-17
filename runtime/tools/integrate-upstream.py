@@ -77,6 +77,54 @@ private final class AnkerDownloadModel: ObservableObject {
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending } ?? []
     }
 
+    // Bridge to Madeira's actual Wine library, not a parallel Anker-only database.
+    // Only stand-alone PE executables can be staged this way; games needing DLLs
+    // must be installed with their full directory under drive_c.
+    func registerExecutable(_ file: URL) {
+        guard !busy else { return }
+        guard file.pathExtension.lowercased() == "exe" else {
+            status = "Only Windows .exe files can be registered."
+            return
+        }
+        do {
+            let data = try Data(contentsOf: file, options: .mappedIfSafe)
+            guard data.count >= 0x40, data[0] == 0x4d, data[1] == 0x5a else {
+                status = "This file is not a Windows PE executable."
+                return
+            }
+            let peOffset = Int(data[0x3c]) | Int(data[0x3d]) << 8
+                | Int(data[0x3e]) << 16 | Int(data[0x3f]) << 24
+            guard peOffset >= 0, peOffset + 26 <= data.count,
+                  data[peOffset] == 0x50, data[peOffset + 1] == 0x45,
+                  data[peOffset + 2] == 0, data[peOffset + 3] == 0 else {
+                status = "Invalid Windows PE header."
+                return
+            }
+            let machine = Int(data[peOffset + 4]) | Int(data[peOffset + 5]) << 8
+            let bits: Int
+            switch machine {
+            case 0x014c: bits = 32
+            case 0x8664: bits = 64
+            default:
+                status = "Unsupported Windows executable architecture."
+                return
+            }
+            let drive = LibraryModel.drive
+            let targetFolder = drive.appendingPathComponent("Games/AnkerImports", isDirectory: true)
+            try FileManager.default.createDirectory(at: targetFolder, withIntermediateDirectories: true)
+            let targetName = UUID().uuidString + "-" + file.lastPathComponent
+            let target = targetFolder.appendingPathComponent(targetName)
+            try FileManager.default.copyItem(at: file, to: target)
+            let relative = "Games/AnkerImports/" + targetName
+            let entry = LibraryEntry(title: file.deletingPathExtension().lastPathComponent,
+                                     relativePath: relative, bits: bits)
+            LibraryModel.shared.save(entry)
+            status = "Added to Madeira library. Launch it from the Games tab."
+        } catch {
+            status = "Library import failed: " + error.localizedDescription
+        }
+    }
+
     func download() async {
         guard !busy, let url = validatedURL else { return }
         busy = true
@@ -200,6 +248,14 @@ private struct AnkerNativeDownloads: View {
                                     .font(.subheadline)
                                     .lineLimit(2)
                                 Spacer(minLength: 8)
+                                if file.pathExtension.lowercased() == "exe" {
+                                    Button {
+                                        model.registerExecutable(file)
+                                    } label: {
+                                        Image(systemName: "plus.rectangle.on.folder")
+                                    }
+                                    .accessibilityLabel("Add executable to Madeira library")
+                                }
                                 ShareLink(item: file) {
                                     Image(systemName: "square.and.arrow.up")
                                 }
