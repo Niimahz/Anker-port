@@ -45,6 +45,16 @@ jobs:
           echo "Selected compatible Xcode: $selected"
           echo "DEVELOPER_DIR=$selected" >> "$GITHUB_ENV"
           DEVELOPER_DIR="$selected" xcrun --sdk iphoneos --show-sdk-version
+          # Verify actual Objective-C compilation, not just a matching header string.
+          cat > /tmp/anker-metalfx-probe.m <<'EOF'
+          #import <MetalFX/MetalFX.h>
+          static void anker_metalfx_probe(void) {
+              MTLFXFrameInterpolatorDescriptor *descriptor = [MTLFXFrameInterpolatorDescriptor new];
+              (void)descriptor;
+          }
+          EOF
+          DEVELOPER_DIR="$selected" xcrun --sdk iphoneos clang -x objective-c -fsyntax-only -Werror=implicit-function-declaration -target arm64-apple-ios17.0 -isysroot "$(DEVELOPER_DIR="$selected" xcrun --sdk iphoneos --show-sdk-path)" /tmp/anker-metalfx-probe.m
+          echo "MetalFX frame interpolation compile probe passed"
       - name: Fetch pinned Madeira source
         run: |
           git clone --filter=blob:none https://github.com/willfaust/Madeira.git native-src
@@ -133,6 +143,27 @@ jobs:
             echo "=== $f ==="
             tail -100 "$f"
           done
+      - name: Summarize failure and toolchain for debugging
+        if: failure()
+        run: |
+          echo "### Anker native build failure diagnostics" >> "$GITHUB_STEP_SUMMARY"
+          echo '~~~' >> "$GITHUB_STEP_SUMMARY"
+          xcodebuild -version >> "$GITHUB_STEP_SUMMARY" 2>&1 || true
+          xcrun --sdk iphoneos --show-sdk-version >> "$GITHUB_STEP_SUMMARY" 2>&1 || true
+          echo '~~~' >> "$GITHUB_STEP_SUMMARY"
+          find native-src/build -type f \( -name '*.err' -o -name '*.log' \) -size +0c 2>/dev/null | head -30 > /tmp/anker-failed-log-paths.txt || true
+          cat /tmp/anker-failed-log-paths.txt >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload native compiler failure logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Anker-Native-Build-Failure-Logs
+          path: |
+            native-src/build/**/*.err
+            native-src/build/**/*.log
+            /tmp/anker-failed-log-paths.txt
+          if-no-files-found: warn
+          retention-days: 14
       - name: Check reusable libraries produced by the build
         if: always()
         id: cache-check
