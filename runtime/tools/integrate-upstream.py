@@ -407,7 +407,6 @@ private struct AnkerNativeDownloads: View {
                         Text(ByteCountFormatter.string(fromByteCount: model.downloadedBytes, countStyle: .file))
                             .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                     }
-                        .foregroundStyle(.secondary)
                     if let saved = model.saved {
                         ShareLink(item: saved) {
                             Label("Share downloaded file", systemImage: "square.and.arrow.up")
