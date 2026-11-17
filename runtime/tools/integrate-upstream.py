@@ -206,6 +206,20 @@ private final class AnkerDownloadModel: ObservableObject {
         configStatus = ""
     }
 
+    func saveConfig() {
+        guard let executable = configExecutable else { return }
+        do {
+            let data = Data(configText.utf8)
+            guard (try JSONSerialization.jsonObject(with: data)) is [String: Any] else {
+                configStatus = "Expected a JSON object."
+                return
+            }
+            try data.write(to: executable.deletingLastPathComponent()
+                .appendingPathComponent(".anker-compatibility.json"), options: .atomic)
+            configStatus = "Saved locally; launch integration is pending."
+        } catch { configStatus = error.localizedDescription }
+    }
+
     func download() async {
         guard !busy, let url = validatedURL else { return }
         busy = true
