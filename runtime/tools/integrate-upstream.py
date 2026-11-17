@@ -122,7 +122,12 @@ private final class AnkerDownloadModel: ObservableObject {
                 .appendingPathComponent(UUID().uuidString + "-" + source.lastPathComponent, isDirectory: true)
             try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(),
                                                     withIntermediateDirectories: true)
-            try FileManager.default.copyItem(at: source, to: destination)
+            do {
+                try FileManager.default.copyItem(at: source, to: destination)
+            } catch {
+                try? FileManager.default.removeItem(at: destination)
+                throw error
+            }
             var candidates: [URL] = []
             if let walker = FileManager.default.enumerator(at: destination,
                     includingPropertiesForKeys: [.isRegularFileKey],
@@ -349,7 +354,7 @@ private struct AnkerNativeDownloads: View {
                 .padding(18)
                 .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
 
-                Label("Archives are saved to Documents/AnkerDownloads. Automatic extraction and game-library import are not enabled yet.",
+                Label("Downloads are saved to Documents/AnkerDownloads. EXE and extracted-folder import use Madeira's native library; archive extraction is not yet supported.",
                       systemImage: "info.circle")
                     .font(.caption)
                     .foregroundStyle(.secondary)
