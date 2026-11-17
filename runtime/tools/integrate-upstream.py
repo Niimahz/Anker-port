@@ -54,6 +54,8 @@ private struct AnkerDownloadEntry: View {
 private final class AnkerDownloadModel: ObservableObject {
     @Published var address = ""
     @Published var status = "Ready to download"
+    @Published var downloadedBytes: Int64 = 0
+    @Published var expectedBytes: Int64 = 0
     @Published var busy = false
     @Published var saved: URL?
     @Published var files: [URL] = []
@@ -93,6 +95,10 @@ private final class AnkerDownloadModel: ObservableObject {
         guard !busy else { return }
         guard (try? file.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) != true else {
             status = "Symbolic-link executables cannot be imported."
+            return
+        }
+        guard ((try? FileManager.default.attributesOfItem(atPath: file.path)[.size] as? NSNumber)?.int64Value ?? 0) > 0 else {
+            status = "The executable is empty or unreadable."
             return
         }
         guard file.pathExtension.lowercased() == "exe" else {
@@ -175,10 +181,15 @@ private final class AnkerDownloadModel: ObservableObject {
     }
 
     func selectImportedExecutable(_ executable: URL) {
-        guard !busy, executableCandidates.contains(executable) else { return }
+        guard !busy, executableCandidates.contains(executable), executable.pathExtension.lowercased() == "exe" else { return }
         do {
+            guard FileManager.default.fileExists(atPath: executable.path) else {
+                status = "Executable no longer exists."
+                return
+            }
             LibraryModel.shared.save(try LibraryModel.inspect(executable))
             executableCandidates = []
+            configExecutable = nil
             status = "Game registered. Open the Games tab to launch."
         } catch {
             status = "Could not register EXE: " + error.localizedDescription
@@ -216,11 +227,14 @@ private final class AnkerDownloadModel: ObservableObject {
         configText = (try? String(contentsOf: path, encoding: .utf8)) ?? """
         {"resolutionWidth":960,"resolutionHeight":540,"fpsLimit":30,"graphicsBackend":"Automatic"}
         """
-        configStatus = ""
+        configStatus = "Edit JSON and tap Save settings."
     }
 
     func saveConfig() {
-        guard let executable = configExecutable else { return }
+        guard let executable = configExecutable, executable.path.hasPrefix(LibraryModel.drive.path + "/") else {
+            configStatus = "Only games inside the Madeira drive can be configured."
+            return
+        }
         do {
             let data = Data(configText.utf8)
             guard !data.isEmpty, data.count <= 131_072, (try JSONSerialization.jsonObject(with: data)) is [String: Any] else {
@@ -237,6 +251,8 @@ private final class AnkerDownloadModel: ObservableObject {
         guard !busy, let url = validatedURL else { return }
         busy = true
         saved = nil
+        downloadedBytes = 0
+        expectedBytes = 0
         status = "Downloading " + url.lastPathComponent
         defer { busy = false; refresh() }
         do {
@@ -250,17 +266,23 @@ private final class AnkerDownloadModel: ObservableObject {
                 status = "Downloaded file is empty."
                 return
             }
+            expectedBytes = response.expectedContentLength
             let candidate = response.suggestedFilename ?? url.lastPathComponent
             let name = URL(fileURLWithPath: candidate).lastPathComponent
             let safeName = name.isEmpty || name == "/" ? "download.bin" : name
             let destination = directory.appendingPathComponent(UUID().uuidString + "-" + safeName)
             try FileManager.default.moveItem(at: temporary, to: destination)
+            downloadedBytes = (try? FileManager.default.attributesOfItem(atPath: destination.path)[.size] as? NSNumber)?.int64Value ?? 0
             saved = destination
             status = "Download complete"
         } catch {
-            status = "Download failed: " + error.localizedDescription
+            status = "Download failed (" + url.host.orEmpty + "): " + error.localizedDescription
         }
     }
+}
+
+private extension Optional where Wrapped == String {
+    var orEmpty: String { self ?? "unknown host" }
 }
 
 private struct AnkerSteamResponse: Decodable {
@@ -377,6 +399,10 @@ private struct AnkerNativeDownloads: View {
                     .accessibilityIdentifier("anker.downloads.start")
                     Text(model.status)
                         .font(.footnote)
+                    if model.downloadedBytes > 0 {
+                        Text(ByteCountFormatter.string(fromByteCount: model.downloadedBytes, countStyle: .file))
+                            .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    }
                         .foregroundStyle(.secondary)
                     if let saved = model.saved {
                         ShareLink(item: saved) {
@@ -449,7 +475,10 @@ private struct AnkerNativeDownloads: View {
                         }
                         ForEach(model.steamGames) { game in
                             if let url = URL(string: "https://store.steampowered.com/app/\(game.id)/") {
-                                Link(game.name, destination: url)
+                                Link(destination: url) {
+                                    Label(game.name, systemImage: "arrow.up.right.square")
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
                             }
                         }
                     }
@@ -458,6 +487,7 @@ private struct AnkerNativeDownloads: View {
                         Label("Downloaded files", systemImage: "folder.fill").font(.headline)
                         Spacer()
                         Text("\(model.files.count)")
+                            .accessibilityLabel("Downloaded file count")
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
                         Button { model.refresh() } label: { Image(systemName: "arrow.clockwise") }
