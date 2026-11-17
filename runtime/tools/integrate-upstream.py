@@ -75,8 +75,8 @@ private final class AnkerDownloadModel: ObservableObject {
     var validatedURL: URL? {
         guard let url = URL(string: address.trimmingCharacters(in: .whitespacesAndNewlines)),
               let scheme = url.scheme?.lowercased(),
-              ["http", "https"].contains(scheme),
-              url.host != nil else { return nil }
+              scheme == "https",
+              url.host != nil, url.user == nil, url.password == nil else { return nil }
         return url
     }
 
@@ -91,6 +91,10 @@ private final class AnkerDownloadModel: ObservableObject {
     // Reuse Madeira's PE inspector and native library persistence.
     func registerExecutable(_ file: URL) {
         guard !busy else { return }
+        guard (try? file.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) != true else {
+            status = "Symbolic-link executables cannot be imported."
+            return
+        }
         guard file.pathExtension.lowercased() == "exe" else {
             status = "Only Windows .exe files can be registered."
             return
@@ -117,6 +121,8 @@ private final class AnkerDownloadModel: ObservableObject {
         guard !busy else { return }
         busy = true
         executableCandidates = []
+        configExecutable = nil
+        configStatus = ""
         defer { busy = false }
         let accessed = source.startAccessingSecurityScopedResource()
         defer { if accessed { source.stopAccessingSecurityScopedResource() } }
@@ -149,7 +155,7 @@ private final class AnkerDownloadModel: ObservableObject {
                     }
                     if file.pathExtension.lowercased() == "exe" {
                         candidates.append(file)
-                        if candidates.count > 500 { break }
+                        if candidates.count >= 500 { break }
                     }
                 }
             }
@@ -159,7 +165,7 @@ private final class AnkerDownloadModel: ObservableObject {
             } else if candidates.isEmpty {
                 status = "Folder copied to Wine drive_c, but no EXE was found."
             } else {
-                executableCandidates = candidates.sorted { $0.lastPathComponent < $1.lastPathComponent }
+                executableCandidates = candidates.sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
                 status = "Folder imported. Choose the main game EXE below."
             }
         } catch {
@@ -181,8 +187,10 @@ private final class AnkerDownloadModel: ObservableObject {
 
     func searchSteam() async {
         let query = steamQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty, !steamBusy else { return }
+        guard !query.isEmpty, query.count <= 120, !steamBusy, !busy else { return }
         steamBusy = true
+        steamGames = []
+        steamError = ""
         defer { steamBusy = false }
         var parts = URLComponents(string: "https://store.steampowered.com/api/storesearch/")
         parts?.queryItems = [URLQueryItem(name: "term", value: query),
@@ -194,7 +202,7 @@ private final class AnkerDownloadModel: ObservableObject {
             guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
                 throw URLError(.badServerResponse)
             }
-            steamGames = try JSONDecoder().decode(AnkerSteamResponse.self, from: data).items
+            steamGames = Array(try JSONDecoder().decode(AnkerSteamResponse.self, from: data).items.prefix(30))
             steamError = ""
         } catch {
             steamGames = []
@@ -215,7 +223,7 @@ private final class AnkerDownloadModel: ObservableObject {
         guard let executable = configExecutable else { return }
         do {
             let data = Data(configText.utf8)
-            guard (try JSONSerialization.jsonObject(with: data)) is [String: Any] else {
+            guard !data.isEmpty, data.count <= 131_072, (try JSONSerialization.jsonObject(with: data)) is [String: Any] else {
                 configStatus = "Expected a JSON object."
                 return
             }
@@ -403,11 +411,13 @@ private struct AnkerNativeDownloads: View {
                         }
                     }
                     if model.configExecutable != nil {
-                        Text("Game settings").font(.headline)
+                        Text("Game settings (local JSON)").font(.headline)
                         TextEditor(text: $model.configText)
+                            .accessibilityIdentifier("anker.config.editor")
                             .font(.system(.caption, design: .monospaced))
                             .frame(height: 170)
                         Button("Save settings") { model.saveConfig() }
+                            .accessibilityIdentifier("anker.config.save")
                             .buttonStyle(.borderedProminent)
                         Text(model.configStatus).font(.caption)
                     }
@@ -422,13 +432,20 @@ private struct AnkerNativeDownloads: View {
                     VStack(alignment: .leading, spacing: 10) {
                         Label("Steam lookup", systemImage: "magnifyingglass").font(.headline)
                         TextField("Find a game on Steam", text: $model.steamQuery)
+                            .submitLabel(.search)
                             .textFieldStyle(.roundedBorder)
+                        Text("Search Steam catalog by title (up to 120 characters).")
+                            .font(.caption).foregroundStyle(.secondary)
                         Button("Search Steam") { Task { await model.searchSteam() } }
                             .accessibilityIdentifier("anker.steam.search")
-                            .disabled(model.steamBusy || model.steamQuery.isEmpty)
+                            .disabled(model.steamBusy || model.steamQuery.isEmpty || model.steamQuery.count > 120)
                         if model.steamBusy { ProgressView() }
                         if !model.steamError.isEmpty {
                             Text(model.steamError).font(.caption).foregroundStyle(.red)
+                        }
+                        if !model.steamBusy && model.steamError.isEmpty && !model.steamQuery.isEmpty && model.steamGames.isEmpty {
+                            Text("No Steam results loaded. Tap Search Steam.")
+                                .font(.caption).foregroundStyle(.secondary)
                         }
                         ForEach(model.steamGames) { game in
                             if let url = URL(string: "https://store.steampowered.com/app/\(game.id)/") {
