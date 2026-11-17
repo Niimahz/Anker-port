@@ -1,17 +1,19 @@
 name: Prepare Anker native source on Linux
 on:
   workflow_dispatch:
-  push:
+  workflow_run:
+    workflows: ["Fast source syntax checks"]
+    types: [completed]
     branches: [main]
-    paths:
-      - '.github/workflows/build-native-runtime.yml'
-      - 'runtime/tools/**'
 jobs:
   preflight:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
       - name: Validate integration tools before reserving macOS
         run: |
           python3 -m py_compile runtime/tools/brand-upstream.py runtime/tools/integrate-upstream.py runtime/tools/verify-ipa.py
@@ -27,6 +29,8 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
       - name: Fetch pinned upstream application source
         run: |
           git clone --filter=blob:none https://github.com/willfaust/Madeira.git native-src
@@ -56,6 +60,8 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
       - name: Prepare actual upstream source tree
         run: |
           git clone --filter=blob:none https://github.com/willfaust/Madeira.git native-src
