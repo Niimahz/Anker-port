@@ -386,7 +386,18 @@ private struct AnkerNativeDownloads: View {
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
                             .buttonStyle(.bordered)
+                            Button("Edit settings") { model.openConfig(executable) }
+                                .font(.caption)
                         }
+                    }
+                    if model.configExecutable != nil {
+                        Text("Game settings").font(.headline)
+                        TextEditor(text: $model.configText)
+                            .font(.system(.caption, design: .monospaced))
+                            .frame(height: 170)
+                        Button("Save settings") { model.saveConfig() }
+                            .buttonStyle(.borderedProminent)
+                        Text(model.configStatus).font(.caption)
                     }
                     Text("Copies the complete folder into Madeira's Wine drive, preserving DLLs and assets.")
                         .font(.caption)
