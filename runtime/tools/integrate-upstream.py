@@ -57,6 +57,7 @@ private final class AnkerDownloadModel: ObservableObject {
     @Published var busy = false
     @Published var saved: URL?
     @Published var files: [URL] = []
+    @Published var executableCandidates: [URL] = []
 
     private var directory: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -107,6 +108,7 @@ private final class AnkerDownloadModel: ObservableObject {
     func importGameFolder(_ source: URL) {
         guard !busy else { return }
         busy = true
+        executableCandidates = []
         defer { busy = false }
         let accessed = source.startAccessingSecurityScopedResource()
         defer { if accessed { source.stopAccessingSecurityScopedResource() } }
@@ -152,6 +154,17 @@ private final class AnkerDownloadModel: ObservableObject {
         }
     }
 
+    func selectImportedExecutable(_ executable: URL) {
+        guard !busy, executableCandidates.contains(executable) else { return }
+        do {
+            LibraryModel.shared.save(try LibraryModel.inspect(executable))
+            executableCandidates = []
+            status = "Game registered. Open the Games tab to launch."
+        } catch {
+            status = "Could not register EXE: " + error.localizedDescription
+        }
+    }
+
     func download() async {
         guard !busy, let url = validatedURL else { return }
         busy = true
@@ -193,15 +206,15 @@ private struct AnkerNativeDownloads: View {
                         .font(.caption.weight(.heavy))
                         .tracking(2)
                         .foregroundStyle(.indigo)
-                    Text("Your games. One place.")
-                        .font(.largeTitle.bold())
+                    Text("Your Windows gaming hub.")
+                        .font(.system(size: 32, weight: .heavy, design: .rounded))
                         .minimumScaleFactor(0.75)
-                    Text("Manage downloads here. Launch installed Windows games from the Madeira library.")
+                    Text("Download, import and organize games. Powered by the Madeira runtime.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(22)
+                .padding(24)
                 .background(
                     LinearGradient(colors: [.indigo.opacity(0.13), .purple.opacity(0.06)],
                                    startPoint: .topLeading, endPoint: .bottomTrailing),
@@ -209,7 +222,7 @@ private struct AnkerNativeDownloads: View {
                 )
 
                 VStack(alignment: .leading, spacing: 12) {
-                    Label("Madeira runtime", systemImage: "cpu")
+                    Label("Runtime health", systemImage: "cpu.fill")
                         .font(.headline)
                     HStack {
                         Text("Windows game library")
@@ -248,7 +261,7 @@ private struct AnkerNativeDownloads: View {
                 .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
 
                 VStack(alignment: .leading, spacing: 14) {
-                    Label("New download", systemImage: "arrow.down.circle.fill")
+                    Label("Download center", systemImage: "arrow.down.circle.fill")
                         .font(.headline)
                     TextField("Paste an HTTPS game file URL", text: $model.address)
                         .textInputAutocapitalization(.never)
@@ -291,7 +304,7 @@ private struct AnkerNativeDownloads: View {
                 .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
 
                 VStack(alignment: .leading, spacing: 12) {
-                    Label("Installed game folder", systemImage: "folder.badge.plus")
+                    Label("Import installed game", systemImage: "folder.badge.plus")
                         .font(.headline)
                     Button {
                         selectingGameFolder = true
