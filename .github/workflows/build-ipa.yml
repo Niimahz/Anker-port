@@ -50,10 +50,40 @@ jobs:
           updated = p.read_text()
           assert old not in updated and new in updated, "DXMT patch verification failed"
           PY
+      - name: Restore reusable Madeira native libraries
+        id: native-cache
+        uses: actions/cache/restore@v4
+        with:
+          key: madeira-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('native-src/tools/build/build-llvm-ios.sh', 'native-src/tools/build/build-fex-ios.sh', 'native-src/tools/build/build-dxmt-ios.sh', 'native-src/tools/build/build-shader-headers.sh', 'native-src/.gitmodules') }}-xcode27
+          path: |
+            native-src/toolchains/llvm-ios-build/.madeira-cache.sha256
+            native-src/toolchains/llvm-ios-build/lib
+            native-src/toolchains/llvm-ios-build/include
+            native-src/toolchains/llvm-project/llvm/include
+            native-src/FEX/build-ios
+            native-src/app/Madeira/libdxmt_combined.a
+      - name: Check restored native library cache
+        run: |
+          if [ -s native-src/toolchains/llvm-ios-build/.madeira-cache.sha256 ]; then
+            (cd native-src/toolchains/llvm-ios-build && shasum -a 256 -c .madeira-cache.sha256)
+          fi
       - name: Build using upstream Madeira toolchain
         run: |
           cd native-src
           bash tools/build-ipa.sh
+      - name: Save completed native libraries even if packaging fails
+        if: always() && steps.native-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          key: madeira-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('native-src/tools/build/build-llvm-ios.sh', 'native-src/tools/build/build-fex-ios.sh', 'native-src/tools/build/build-dxmt-ios.sh', 'native-src/tools/build/build-shader-headers.sh', 'native-src/.gitmodules') }}-xcode27
+          path: |
+            native-src/toolchains/llvm-ios-build/.madeira-cache.sha256
+            native-src/toolchains/llvm-ios-build/lib
+            native-src/toolchains/llvm-ios-build/include
+            native-src/toolchains/llvm-project/llvm/include
+            native-src/FEX/build-ios
+            native-src/app/Madeira/libdxmt_combined.a
       - name: Verify and package user-signable IPA
         run: |
           mkdir -p dist
