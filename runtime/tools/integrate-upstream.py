@@ -423,6 +423,7 @@ private struct AnkerNativeDownloads: View {
                         TextField("Find a game on Steam", text: $model.steamQuery)
                             .textFieldStyle(.roundedBorder)
                         Button("Search Steam") { Task { await model.searchSteam() } }
+                            .accessibilityIdentifier("anker.steam.search")
                             .disabled(model.steamBusy || model.steamQuery.isEmpty)
                         if model.steamBusy { ProgressView() }
                         if !model.steamError.isEmpty {
