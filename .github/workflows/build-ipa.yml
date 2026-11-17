@@ -100,6 +100,15 @@ jobs:
         run: |
           cd native-src
           bash tools/build-ipa.sh
+      - name: Show DXMT compiler diagnostics on failure
+        if: failure()
+        run: |
+          echo "=== DXMT failed compiler diagnostics ==="
+          for f in native-src/build/dxmt-ios/obj/*.err; do
+            [ -s "$f" ] || continue
+            echo "=== $f ==="
+            tail -100 "$f"
+          done
       - name: Check reusable libraries produced by the build
         if: always()
         id: cache-check
