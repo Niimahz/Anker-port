@@ -370,34 +370,30 @@ private struct AnkerNativeDownloads: View {
                 .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
 
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Label("Steam lookup", systemImage: "magnifyingglass")
-                        .font(.headline)
-                    TextField("Find a game on Steam", text: $model.steamQuery)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    Button("Search Steam") { Task { await model.searchSteam() } }
-                        .disabled(model.steamBusy || model.steamQuery.isEmpty)
-                    if model.steamBusy { ProgressView() }
-                    if !model.steamError.isEmpty {
-                        Text(model.steamError).font(.caption).foregroundStyle(.red)
-                    }
-                    ForEach(model.steamGames) { game in
-                        if let url = URL(string: "https://store.steampowered.com/app/\\(game.id)/") {
-                            Link(game.name, destination: url)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("Steam lookup", systemImage: "magnifyingglass").font(.headline)
+                        TextField("Find a game on Steam", text: $model.steamQuery)
+                            .textFieldStyle(.roundedBorder)
+                        Button("Search Steam") { Task { await model.searchSteam() } }
+                            .disabled(model.steamBusy || model.steamQuery.isEmpty)
+                        if model.steamBusy { ProgressView() }
+                        if !model.steamError.isEmpty {
+                            Text(model.steamError).font(.caption).foregroundStyle(.red)
+                        }
+                        ForEach(model.steamGames) { game in
+                            if let url = URL(string: "https://store.steampowered.com/app/\(game.id)/") {
+                                Link(game.name, destination: url)
+                            }
                         }
                     }
                     Divider()
-                    Label("Downloaded files", systemImage: "folder.fill")
-                            .font(.headline)
+                    HStack {
+                        Label("Downloaded files", systemImage: "folder.fill").font(.headline)
                         Spacer()
                         Text("\(model.files.count)")
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
-                        Button { model.refresh() } label: {
-                            Image(systemName: "arrow.clockwise")
-                        }
-                        .accessibilityLabel("Refresh downloads")
+                        Button { model.refresh() } label: { Image(systemName: "arrow.clockwise") }
                     }
                     if model.files.isEmpty {
                         ContentUnavailableView("No downloads yet",
