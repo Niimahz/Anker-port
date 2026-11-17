@@ -61,6 +61,31 @@ jobs:
         run: |
           git clone --filter=blob:none https://github.com/willfaust/Madeira.git native-src
           git -C native-src checkout fbad430410b4075192166172447c859714726de9
+      - name: Enable ARM64 Wine system programs on Intel build hosts
+        run: |
+          python3 - <<'PYCODE'
+          from pathlib import Path
+          import re
+          root = Path("native-src")
+          # Wine defaults these programs to HOST_ARCH, which is x86_64 on
+          # this runner even though the shipped Windows runtime is aarch64.
+          # Set every such program explicitly, preserving the complete farm.
+          configure = root / "wine/configure.ac"
+          # The Wine source is a submodule; initialize before reading its defaults.
+          import subprocess
+          subprocess.run(["git", "-C", str(root), "submodule", "update", "--init", "wine"], check=True)
+          programs = re.findall(r'enable_(\w+)=\$\{enable_\1:-\$HOST_ARCH\}', configure.read_text())
+          programs = [name for name in programs if (root / "wine/programs" / name / "Makefile.in").is_file()]
+          assert {"conhost", "wineboot", "services", "rpcss"} <= set(programs), "Wine program defaults changed"
+          script = root / "tools/build/build-wine.sh"
+          source = script.read_text()
+          old = "../configure --enable-archs=aarch64 --disable-tests --without-x"
+          assert source.count(old) == 1, "Wine configure invocation changed"
+          flags = " ".join("--enable-" + name + "=aarch64" for name in programs)
+          script.write_text(source.replace(old, old + " " + flags))
+          print("Enabled aarch64 system programs:", ", ".join(programs))
+          PYCODE
+          bash -n native-src/tools/build/build-wine.sh
       - name: Rebuild StikJIT 2.0.1 with the selected Xcode toolchain
         run: |
           set -euo pipefail
