@@ -62,6 +62,9 @@ private final class AnkerDownloadModel: ObservableObject {
     @Published var steamGames: [AnkerSteamGame] = []
     @Published var steamError = ""
     @Published var steamBusy = false
+    @Published var configExecutable: URL?
+    @Published var configText = ""
+    @Published var configStatus = ""
 
 
     private var directory: URL {
