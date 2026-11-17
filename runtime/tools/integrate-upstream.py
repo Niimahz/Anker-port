@@ -197,6 +197,15 @@ private final class AnkerDownloadModel: ObservableObject {
         }
     }
 
+    func openConfig(_ executable: URL) {
+        configExecutable = executable
+        let path = executable.deletingLastPathComponent().appendingPathComponent(".anker-compatibility.json")
+        configText = (try? String(contentsOf: path, encoding: .utf8)) ?? """
+        {"resolutionWidth":960,"resolutionHeight":540,"fpsLimit":30,"graphicsBackend":"Automatic"}
+        """
+        configStatus = ""
+    }
+
     func download() async {
         guard !busy, let url = validatedURL else { return }
         busy = true
