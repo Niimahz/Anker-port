@@ -163,6 +163,7 @@ private final class AnkerDownloadModel: ObservableObject {
                 status = "Folder imported. Choose the main game EXE below."
             }
         } catch {
+            executableCandidates = []
             status = "Game folder import failed: " + error.localizedDescription
         }
     }
