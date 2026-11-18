@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'runtime/tools/integrate-upstream.py'
+      - 'runtime/tools/prepare-swift-catalog.py'
       - 'runtime/tools/brand-upstream.py'
       - 'runtime/tools/verify-ipa.py'
       - '.github/workflows/build-ipa.yml'
@@ -12,7 +13,7 @@ permissions:
   contents: read
 concurrency:
   group: anker-ipa-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   build:
     # Avoid the ARM64 hosted pool that failed to allocate a runner.
@@ -61,23 +62,23 @@ jobs:
         run: |
           git clone --filter=blob:none https://github.com/willfaust/Madeira.git native-src
           git -C native-src checkout fbad430410b4075192166172447c859714726de9
-      - name: Validate integration and type-check the Anker UI against Madeira and the iPhone SDK
+      - name: Test the integration and type-check the complete Madeira Swift target
         shell: bash
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tests -p 'test_*.py' -v
           python3 runtime/tools/brand-upstream.py native-src
           python3 runtime/tools/integrate-upstream.py native-src
+          python3 runtime/tools/prepare-swift-catalog.py native-src
           cd native-src/app/Madeira
           # The pinned Madeira target contains all Swift files under this directory.
-          # Check the modified file with the other target sources available for name lookup.
           sources=()
           while IFS= read -r -d '' file; do
             sources+=("$file")
-          done < <(find . -name '*.swift' ! -path './MadeiraApp.swift' -print0)
-          xcrun --sdk iphoneos swiftc -frontend -typecheck -parse-as-library \
-            -primary-file MadeiraApp.swift "${sources[@]}" \
-            -module-name Madeira -swift-version 5 -D DEBUG -enable-bare-slash-regex \
+          done < <(find . -name '*.swift' -print0)
+          xcrun --sdk iphoneos swiftc -typecheck -enable-batch-mode -j 1 -driver-batch-count 17 -parse-as-library \
+            "${sources[@]}" \
+            -module-name Madeira -swift-version 5 -D DEBUG -enable-bare-slash-regex -Xfrontend -enable-cross-import-overlays \
             -target arm64-apple-ios18.0 -sdk "$(xcrun --sdk iphoneos --show-sdk-path)" \
             -import-objc-header Madeira-Bridging-Header.h
       - name: Prepare Rust iOS dependencies with network retries
@@ -311,7 +312,7 @@ jobs:
         run: |
           mkdir -p dist
           cp native-src/dist/Madeira.ipa dist/AnkerPort-unsigned.ipa
-          python3 runtime/tools/verify-ipa.py dist/AnkerPort-unsigned.ipa
+          python3 runtime/tools/verify-ipa.py dist/AnkerPort-unsigned.ipa --revision "$(git -C native-src rev-parse HEAD)"
           shasum -a 256 dist/AnkerPort-unsigned.ipa > dist/SHA256SUMS
       - uses: actions/upload-artifact@v6
         with:

@@ -90,6 +90,17 @@ private final class AnkerDownloadModel: ObservableObject {
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending } ?? []
     }
 
+    private func addToLibrary(_ executable: URL) throws {
+        let entry = try LibraryModel.inspect(executable)
+        let library = LibraryModel.shared
+        library.save(entry)
+        guard library.entries.contains(where: { $0.id == entry.id }) else {
+            throw NSError(domain: "AnkerImport", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: library.error ?? "Madeira could not register the game."
+            ])
+        }
+    }
+
     // Reuse Madeira's PE inspector and native library persistence.
     func registerExecutable(_ file: URL) {
         guard !busy else { return }
@@ -111,7 +122,7 @@ private final class AnkerDownloadModel: ObservableObject {
             let target = targetFolder.appendingPathComponent(UUID().uuidString + "-" + file.lastPathComponent)
             try FileManager.default.copyItem(at: file, to: target)
             do {
-                LibraryModel.shared.save(try LibraryModel.inspect(target))
+                try addToLibrary(target)
                 status = "Added to Madeira library. Launch it from the Games tab."
             } catch {
                 try? FileManager.default.removeItem(at: target)
@@ -159,14 +170,20 @@ private final class AnkerDownloadModel: ObservableObject {
                         walker.skipDescendants()
                         continue
                     }
-                    if file.pathExtension.lowercased() == "exe" {
+                    if file.pathExtension.lowercased() == "exe",
+                       (try? file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true {
                         candidates.append(file)
                         if candidates.count >= 500 { break }
                     }
                 }
             }
             if candidates.count == 1, let executable = candidates.first {
-                LibraryModel.shared.save(try LibraryModel.inspect(executable))
+                do {
+                    try addToLibrary(executable)
+                } catch {
+                    try? FileManager.default.removeItem(at: destination)
+                    throw error
+                }
                 status = "Game folder imported and executable registered in Madeira."
             } else if candidates.isEmpty {
                 status = "Folder copied to Wine drive_c, but no EXE was found."
@@ -187,7 +204,7 @@ private final class AnkerDownloadModel: ObservableObject {
                 status = "Executable no longer exists."
                 return
             }
-            LibraryModel.shared.save(try LibraryModel.inspect(executable))
+            try addToLibrary(executable)
             executableCandidates = []
             configExecutable = nil
             status = "Game registered. Open the Games tab to launch."
