@@ -119,21 +119,15 @@ jobs:
           brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
           cd /tmp/anker-stikjit-src
           xcodegen generate
-          xcodebuild archive -scheme StikJIT -configuration Release -destination 'generic/platform=iOS' -archivePath /tmp/anker-stikjit-archive CODE_SIGNING_ALLOWED=NO BUILD_LIBRARY_FOR_DISTRIBUTION=YES
-          xcodebuild -create-xcframework -framework /tmp/anker-stikjit-archive.xcarchive/Products/Library/Frameworks/StikJIT.framework -output /tmp/anker-StikJIT.xcframework
+          xcodebuild archive -scheme StikJIT -configuration Release -destination 'generic/platform=iOS' -archivePath /tmp/anker-stikjit-archive CODE_SIGNING_ALLOWED=NO BUILD_LIBRARY_FOR_DISTRIBUTION=NO
+          xcodebuild -create-xcframework -allow-internal-distribution -framework /tmp/anker-stikjit-archive.xcarchive/Products/Library/Frameworks/StikJIT.framework -output /tmp/anker-StikJIT.xcframework
           cd "$GITHUB_WORKSPACE"
           rm -rf native-src/app/Frameworks/StikJIT.xcframework
           cp -R /tmp/anker-StikJIT.xcframework native-src/app/Frameworks/StikJIT.xcframework
-          python3 - <<'PY'
-          from pathlib import Path
-          root = Path("native-src/app/Frameworks/StikJIT.xcframework")
-          interfaces = list(root.rglob("*.swiftinterface"))
-          assert interfaces, "No StikJIT Swift module interfaces were produced"
-          for path in interfaces:
-              source = path.read_text()
-              assert "::" not in source, f"Malformed interface: {path}"
-              print(path, source.splitlines()[1])
-          PY
+          frameworks="$GITHUB_WORKSPACE/native-src/app/Frameworks/StikJIT.xcframework/ios-arm64"
+          test -s "$frameworks/StikJIT.framework/Modules/StikJIT.swiftmodule/arm64-apple-ios.swiftmodule"
+          printf 'import StikJIT\n' > "$RUNNER_TEMP/anker-stikjit-import.swift"
+          xcrun --sdk iphoneos swiftc -typecheck -target arm64-apple-ios17.0 -sdk "$(xcrun --sdk iphoneos --show-sdk-path)" -F "$frameworks" "$RUNNER_TEMP/anker-stikjit-import.swift"
       - name: Integrate Anker with actual Madeira application
         run: |
           python3 runtime/tools/brand-upstream.py native-src
