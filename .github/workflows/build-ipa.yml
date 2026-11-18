@@ -127,7 +127,7 @@ jobs:
           frameworks="$GITHUB_WORKSPACE/native-src/app/Frameworks/StikJIT.xcframework/ios-arm64"
           test -s "$frameworks/StikJIT.framework/Modules/StikJIT.swiftmodule/arm64-apple-ios.swiftmodule"
           printf 'import StikJIT\n' > "$RUNNER_TEMP/anker-stikjit-import.swift"
-          xcrun --sdk iphoneos swiftc -typecheck -target arm64-apple-ios17.0 -sdk "$(xcrun --sdk iphoneos --show-sdk-path)" -F "$frameworks" "$RUNNER_TEMP/anker-stikjit-import.swift"
+          xcrun --sdk iphoneos swiftc -typecheck -target arm64-apple-ios26.0 -sdk "$(xcrun --sdk iphoneos --show-sdk-path)" -F "$frameworks" "$RUNNER_TEMP/anker-stikjit-import.swift"
       - name: Integrate Anker with actual Madeira application
         run: |
           python3 runtime/tools/brand-upstream.py native-src
