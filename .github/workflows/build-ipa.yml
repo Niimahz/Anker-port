@@ -142,6 +142,17 @@ jobs:
       - name: Patch pinned DXMT Metal atomic API compatibility
         run: |
           git -C native-src submodule update --init dxmt
+          # Meson's native tools must execute on the macOS runner.
+          export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+          cc="$(xcrun --sdk macosx --find clang)"
+          cxx="$(xcrun --sdk macosx --find clang++)"
+          printf "[binaries]\nc = '%s'\ncpp = '%s'\n" "$cc" "$cxx" > native-src/dxmt/build-osx.txt
+          for lang in c c++; do
+            compiler="$cc"
+            if [ "$lang" = c++ ]; then compiler="$cxx"; fi
+            printf 'int main(void) { return 0; }\n' | "$compiler" -x "$lang" -o "$RUNNER_TEMP/dxmt-native-probe" -
+            "$RUNNER_TEMP/dxmt-native-probe"
+          done
           python3 - <<'PY'
           from pathlib import Path
           p = Path("native-src/dxmt/src/airconv/shaders/air_tessellation.metal")
