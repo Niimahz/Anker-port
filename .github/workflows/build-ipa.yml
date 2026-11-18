@@ -22,7 +22,7 @@ jobs:
       HOMEBREW_NO_AUTO_UPDATE: "1"
       CONFIGURATION: Debug
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Validate MetalFX frame interpolation SDK before expensive build
         run: |
           set -euo pipefail
@@ -190,7 +190,7 @@ jobs:
           test -f native-src/FEX/CMakeLists.txt
       - name: Restore compiled LLVM iOS libraries
         id: llvm-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           key: anker-llvm-v1-macos15-fbad4304-${{ hashFiles('native-src/tools/build/build-llvm-ios.sh') }}
           path: |
@@ -200,13 +200,13 @@ jobs:
             native-src/toolchains/llvm-project/llvm/include
       - name: Restore compiled FEX iOS libraries
         id: fex-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           key: anker-fex-v1-macos15-fbad4304-${{ hashFiles('native-src/tools/build/build-fex-ios.sh') }}
           path: native-src/FEX/build-ios
       - name: Restore compiled DXMT iOS library
         id: dxmt-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           key: anker-dxmt-v2-macos15-fbad4304-atomic4-${{ hashFiles('native-src/tools/build/build-dxmt-ios.sh', 'native-src/tools/build/build-shader-headers.sh') }}
           path: native-src/app/Madeira/libdxmt_combined.a
@@ -239,7 +239,7 @@ jobs:
           cat /tmp/anker-failed-log-paths.txt >> "$GITHUB_STEP_SUMMARY"
       - name: Upload native compiler failure logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: Anker-Native-Build-Failure-Logs
           path: |
@@ -273,7 +273,7 @@ jobs:
           fi
       - name: Cache completed LLVM libraries even if another component fails
         if: always() && steps.cache-check.outputs.llvm == 'true' && steps.llvm-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           key: anker-llvm-v1-macos15-fbad4304-${{ hashFiles('native-src/tools/build/build-llvm-ios.sh') }}
           path: |
@@ -283,13 +283,13 @@ jobs:
             native-src/toolchains/llvm-project/llvm/include
       - name: Cache completed FEX libraries even if another component fails
         if: always() && steps.cache-check.outputs.fex == 'true' && steps.fex-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           key: anker-fex-v1-macos15-fbad4304-${{ hashFiles('native-src/tools/build/build-fex-ios.sh') }}
           path: native-src/FEX/build-ios
       - name: Cache completed DXMT library
         if: always() && steps.cache-check.outputs.dxmt == 'true' && steps.dxmt-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           key: anker-dxmt-v2-macos15-fbad4304-atomic4-${{ hashFiles('native-src/tools/build/build-dxmt-ios.sh', 'native-src/tools/build/build-shader-headers.sh') }}
           path: native-src/app/Madeira/libdxmt_combined.a
@@ -299,7 +299,7 @@ jobs:
           cp native-src/dist/Madeira.ipa dist/AnkerPort-unsigned.ipa
           python3 runtime/tools/verify-ipa.py dist/AnkerPort-unsigned.ipa
           shasum -a 256 dist/AnkerPort-unsigned.ipa > dist/SHA256SUMS
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: AnkerPort-Unsigned-IPA
           path: dist/

@@ -304,239 +304,11 @@ private struct AnkerNativeDownloads: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("ANKER PORT", systemImage: "square.stack.3d.up.fill")
-                        .font(.caption.weight(.heavy))
-                        .tracking(2)
-                        .foregroundStyle(.indigo)
-                    Text("Your Windows gaming hub.")
-                    Text(String(library.entries.count) + " games in library")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .font(.system(size: 32, weight: .heavy, design: .rounded))
-                        .minimumScaleFactor(0.75)
-                    Text("Download, import and organize games. Powered by the Madeira runtime.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(24)
-                .background(
-                    LinearGradient(colors: [.indigo.opacity(0.13), .purple.opacity(0.06)],
-                                   startPoint: .topLeading, endPoint: .bottomTrailing),
-                    in: RoundedRectangle(cornerRadius: 22)
-                )
-
-                VStack(alignment: .leading, spacing: 12) {
-                    Label("Runtime health", systemImage: "cpu.fill")
-                        .font(.headline)
-                    HStack {
-                        Text("Windows game library")
-                        Spacer()
-                        Text(String(library.entries.count) + " entries")
-                            .foregroundStyle(.secondary)
-                    }
-                    HStack {
-                        Text("JIT method")
-                        Spacer()
-                        Text(jit.resolvedMethod.title)
-                            .foregroundStyle(.secondary)
-                    }
-                    HStack {
-                        Text("JIT status")
-                        Spacer()
-                        Text(jit.busy ? "Connecting…" : (jit.status ?? (jit.error == nil ? "Not checked" : "Needs attention")))
-                            .foregroundStyle(jit.error == nil ? .secondary : .red)
-                            .lineLimit(2)
-                    }
-                    if let error = jit.error {
-                        Text(error)
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
-                    if let error = library.error {
-                        Text(error)
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
-                    Text("Game launches and JIT activation remain managed by Madeira.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(18)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
-
-                VStack(alignment: .leading, spacing: 14) {
-                    Label("Download center", systemImage: "arrow.down.circle.fill")
-                        .font(.headline)
-                    TextField("Paste an HTTPS game file URL", text: $model.address)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .keyboardType(.URL)
-                        .textContentType(.URL)
-                        .submitLabel(.done)
-                        .padding(14)
-                        .background(.quaternary.opacity(0.55), in: RoundedRectangle(cornerRadius: 12))
-                        .accessibilityIdentifier("anker.downloads.url")
-                    Button {
-                        Task { await model.download() }
-                    } label: {
-                        HStack {
-                            Spacer()
-                            if model.busy { ProgressView().tint(.white) }
-                            else { Image(systemName: "arrow.down.to.line.compact") }
-                            Text(model.busy ? "Downloading…" : "Download file")
-                                .fontWeight(.semibold)
-                            Spacer()
-                        }
-                        .padding(14)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.white)
-                    .background(.indigo, in: RoundedRectangle(cornerRadius: 13))
-                    .disabled(model.busy || model.validatedURL == nil)
-                    .opacity(model.busy || model.validatedURL == nil ? 0.55 : 1)
-                    .accessibilityIdentifier("anker.downloads.start")
-                    Text(model.status)
-                        .font(.footnote)
-                    if model.expectedBytes > 0 {
-                        Text("Expected: " + ByteCountFormatter.string(fromByteCount: model.expectedBytes, countStyle: .file))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    if model.downloadedBytes > 0 {
-                        Text(ByteCountFormatter.string(fromByteCount: model.downloadedBytes, countStyle: .file))
-                            .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-                    }
-                    if let saved = model.saved {
-                        ShareLink(item: saved) {
-                            Label("Share downloaded file", systemImage: "square.and.arrow.up")
-                        }
-                    }
-                }
-                .padding(18)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
-
-                VStack(alignment: .leading, spacing: 12) {
-                    Label("Import installed game", systemImage: "folder.badge.plus")
-                        .font(.headline)
-                    Button {
-                        selectingGameFolder = true
-                    } label: {
-                        Label("Import extracted game folder", systemImage: "square.and.arrow.down.on.square")
-                    }
-                    .disabled(model.busy)
-                    if !model.executableCandidates.isEmpty {
-                        Text("Choose the game EXE (" + String(model.executableCandidates.count) + ")")
-                            .font(.subheadline.weight(.semibold))
-                        ForEach(model.executableCandidates, id: \.path) { executable in
-                            Button {
-                                model.selectImportedExecutable(executable)
-                            } label: {
-                                Label(executable.lastPathComponent, systemImage: "gamecontroller.fill")
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            .buttonStyle(.bordered)
-                            Button("Edit settings") { model.openConfig(executable) }
-                                .font(.caption)
-                        }
-                    }
-                    if model.configExecutable != nil {
-                        Text("Game settings (local JSON)").font(.headline)
-                        Text("Saved settings do not yet change the Madeira game launch.")
-                            .font(.caption).foregroundStyle(.secondary)
-                        TextEditor(text: $model.configText)
-                            .accessibilityIdentifier("anker.config.editor")
-                            .font(.system(.caption, design: .monospaced))
-                            .frame(height: 170)
-                        Button("Save settings") { model.saveConfig() }
-                            .accessibilityIdentifier("anker.config.save")
-                            .buttonStyle(.borderedProminent)
-                        Text(model.configStatus).font(.caption)
-                    }
-                    Text("Copies the complete folder into Madeira's Wine drive, preserving DLLs and assets.")
-                        .accessibilityIdentifier("anker.import.description")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(18)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
-
-                VStack(alignment: .leading, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Label("Steam lookup", systemImage: "magnifyingglass").font(.headline)
-                        TextField("Find a game on Steam", text: $model.steamQuery)
-                            .submitLabel(.search)
-                            .textFieldStyle(.roundedBorder)
-                        Text("Search Steam catalog by title (up to 120 characters).")
-                            .font(.caption).foregroundStyle(.secondary)
-                        Button("Search Steam") { Task { await model.searchSteam() } }
-                            .accessibilityIdentifier("anker.steam.search")
-                            .disabled(model.steamBusy || model.steamQuery.isEmpty || model.steamQuery.count > 120)
-                        if model.steamBusy { ProgressView() }
-                        if !model.steamError.isEmpty {
-                            Text(model.steamError).font(.caption).foregroundStyle(.red)
-                        }
-                        if !model.steamBusy && model.steamError.isEmpty && !model.steamQuery.isEmpty && model.steamGames.isEmpty {
-                            Text("No Steam results loaded. Tap Search Steam.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        if !model.steamGames.isEmpty {
-                            Text(String(model.steamGames.count) + " Steam results")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        ForEach(model.steamGames) { game in
-                            if let url = URL(string: "https://store.steampowered.com/app/\(game.id)/") {
-                                Link(destination: url) {
-                                    Label(game.name, systemImage: "arrow.up.right.square")
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                            }
-                        }
-                    }
-                    Divider()
-                    HStack {
-                        Label("Downloaded files", systemImage: "folder.fill").font(.headline)
-                        Spacer()
-                        Text("\(model.files.count)")
-                            .accessibilityLabel("Downloaded file count")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                        Button { model.refresh() } label: { Image(systemName: "arrow.clockwise") }
-                    }
-                    if model.files.isEmpty {
-                        ContentUnavailableView("No downloads yet",
-                                               systemImage: "tray",
-                                               description: Text("Your downloaded archives and installers appear here."))
-                    } else {
-                        ForEach(model.files, id: \.path) { file in
-                            HStack(spacing: 12) {
-                                Image(systemName: "doc.zipper")
-                                    .font(.title3)
-                                    .foregroundStyle(.indigo)
-                                Text(file.lastPathComponent)
-                                    .font(.subheadline)
-                                    .lineLimit(2)
-                                Spacer(minLength: 8)
-                                if file.pathExtension.lowercased() == "exe" {
-                                    Button {
-                                        model.registerExecutable(file)
-                                    } label: {
-                                        Image(systemName: "plus.rectangle.on.folder")
-                                    }
-                                    .accessibilityLabel("Add executable to Madeira library")
-                                }
-                                ShareLink(item: file) {
-                                    Image(systemName: "square.and.arrow.up")
-                                }
-                                .accessibilityLabel("Share " + file.lastPathComponent)
-                            }
-                            .padding(.vertical, 7)
-                            Divider()
-                        }
-                    }
-                }
-                .padding(18)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+                header
+                runtimeHealth
+                downloadCenter
+                gameImport
+                steamAndFiles
 
                 Label("Downloads are saved to Documents/AnkerDownloads. EXE and extracted-folder import use Madeira's native library; archive extraction is not yet supported.",
                       systemImage: "info.circle")
@@ -565,6 +337,249 @@ private struct AnkerNativeDownloads: View {
                 model.status = "Folder picker failed: " + error.localizedDescription
             }
         }
+    }
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("ANKER PORT", systemImage: "square.stack.3d.up.fill")
+                .font(.caption.weight(.heavy))
+                .tracking(2)
+                .foregroundStyle(.indigo)
+            Text("Your Windows gaming hub.")
+            Text(String(library.entries.count) + " games in library")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .font(.system(size: 32, weight: .heavy, design: .rounded))
+                .minimumScaleFactor(0.75)
+            Text("Download, import and organize games. Powered by the Madeira runtime.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(24)
+        .background(
+            LinearGradient(colors: [.indigo.opacity(0.13), .purple.opacity(0.06)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing),
+            in: RoundedRectangle(cornerRadius: 22)
+        )
+    }
+
+    private var runtimeHealth: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Runtime health", systemImage: "cpu.fill")
+                .font(.headline)
+            HStack {
+                Text("Windows game library")
+                Spacer()
+                Text(String(library.entries.count) + " entries")
+                    .foregroundStyle(.secondary)
+            }
+            HStack {
+                Text("JIT method")
+                Spacer()
+                Text(jit.resolvedMethod.title)
+                    .foregroundStyle(.secondary)
+            }
+            HStack {
+                Text("JIT status")
+                Spacer()
+                Text(jit.busy ? "Connecting…" : (jit.status ?? (jit.error == nil ? "Not checked" : "Needs attention")))
+                    .foregroundStyle(jit.error == nil ? Color.secondary : Color.red)
+                    .lineLimit(2)
+            }
+            if let error = jit.error {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+            if let error = library.error {
+                Text(error)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+            Text("Game launches and JIT activation remain managed by Madeira.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(18)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+    }
+
+    private var downloadCenter: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label("Download center", systemImage: "arrow.down.circle.fill")
+                .font(.headline)
+            TextField("Paste an HTTPS game file URL", text: $model.address)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.URL)
+                .textContentType(.URL)
+                .submitLabel(.done)
+                .padding(14)
+                .background(.quaternary.opacity(0.55), in: RoundedRectangle(cornerRadius: 12))
+                .accessibilityIdentifier("anker.downloads.url")
+            Button {
+                Task { await model.download() }
+            } label: {
+                HStack {
+                    Spacer()
+                    if model.busy { ProgressView().tint(.white) }
+                    else { Image(systemName: "arrow.down.to.line.compact") }
+                    Text(model.busy ? "Downloading…" : "Download file")
+                        .fontWeight(.semibold)
+                    Spacer()
+                }
+                .padding(14)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white)
+            .background(.indigo, in: RoundedRectangle(cornerRadius: 13))
+            .disabled(model.busy || model.validatedURL == nil)
+            .opacity(model.busy || model.validatedURL == nil ? 0.55 : 1)
+            .accessibilityIdentifier("anker.downloads.start")
+            Text(model.status)
+                .font(.footnote)
+            if model.expectedBytes > 0 {
+                Text("Expected: " + ByteCountFormatter.string(fromByteCount: model.expectedBytes, countStyle: .file))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if model.downloadedBytes > 0 {
+                Text(ByteCountFormatter.string(fromByteCount: model.downloadedBytes, countStyle: .file))
+                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            }
+            if let saved = model.saved {
+                ShareLink(item: saved) {
+                    Label("Share downloaded file", systemImage: "square.and.arrow.up")
+                }
+            }
+        }
+        .padding(18)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+    }
+
+    private var gameImport: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Import installed game", systemImage: "folder.badge.plus")
+                .font(.headline)
+            Button {
+                selectingGameFolder = true
+            } label: {
+                Label("Import extracted game folder", systemImage: "square.and.arrow.down.on.square")
+            }
+            .disabled(model.busy)
+            if !model.executableCandidates.isEmpty {
+                Text("Choose the game EXE (" + String(model.executableCandidates.count) + ")")
+                    .font(.subheadline.weight(.semibold))
+                ForEach(model.executableCandidates, id: \.path) { executable in
+                    Button {
+                        model.selectImportedExecutable(executable)
+                    } label: {
+                        Label(executable.lastPathComponent, systemImage: "gamecontroller.fill")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.bordered)
+                    Button("Edit settings") { model.openConfig(executable) }
+                        .font(.caption)
+                }
+            }
+            if model.configExecutable != nil {
+                Text("Game settings (local JSON)").font(.headline)
+                Text("Saved settings do not yet change the Madeira game launch.")
+                    .font(.caption).foregroundStyle(.secondary)
+                TextEditor(text: $model.configText)
+                    .accessibilityIdentifier("anker.config.editor")
+                    .font(.system(.caption, design: .monospaced))
+                    .frame(height: 170)
+                Button("Save settings") { model.saveConfig() }
+                    .accessibilityIdentifier("anker.config.save")
+                    .buttonStyle(.borderedProminent)
+                Text(model.configStatus).font(.caption)
+            }
+            Text("Copies the complete folder into Madeira's Wine drive, preserving DLLs and assets.")
+                .accessibilityIdentifier("anker.import.description")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(18)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+    }
+
+    private var steamAndFiles: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("Steam lookup", systemImage: "magnifyingglass").font(.headline)
+                TextField("Find a game on Steam", text: $model.steamQuery)
+                    .submitLabel(.search)
+                    .textFieldStyle(.roundedBorder)
+                Text("Search Steam catalog by title (up to 120 characters).")
+                    .font(.caption).foregroundStyle(.secondary)
+                Button("Search Steam") { Task { await model.searchSteam() } }
+                    .accessibilityIdentifier("anker.steam.search")
+                    .disabled(model.steamBusy || model.steamQuery.isEmpty || model.steamQuery.count > 120)
+                if model.steamBusy { ProgressView() }
+                if !model.steamError.isEmpty {
+                    Text(model.steamError).font(.caption).foregroundStyle(.red)
+                }
+                if !model.steamBusy && model.steamError.isEmpty && !model.steamQuery.isEmpty && model.steamGames.isEmpty {
+                    Text("No Steam results loaded. Tap Search Steam.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if !model.steamGames.isEmpty {
+                    Text(String(model.steamGames.count) + " Steam results")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                ForEach(model.steamGames) { game in
+                    if let url = URL(string: "https://store.steampowered.com/app/\(game.id)/") {
+                        Link(destination: url) {
+                            Label(game.name, systemImage: "arrow.up.right.square")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+            }
+            Divider()
+            HStack {
+                Label("Downloaded files", systemImage: "folder.fill").font(.headline)
+                Spacer()
+                Text("\(model.files.count)")
+                    .accessibilityLabel("Downloaded file count")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                Button { model.refresh() } label: { Image(systemName: "arrow.clockwise") }
+            }
+            if model.files.isEmpty {
+                ContentUnavailableView("No downloads yet",
+                                       systemImage: "tray",
+                                       description: Text("Your downloaded archives and installers appear here."))
+            } else {
+                ForEach(model.files, id: \.path) { file in
+                    HStack(spacing: 12) {
+                        Image(systemName: "doc.zipper")
+                            .font(.title3)
+                            .foregroundStyle(.indigo)
+                        Text(file.lastPathComponent)
+                            .font(.subheadline)
+                            .lineLimit(2)
+                        Spacer(minLength: 8)
+                        if file.pathExtension.lowercased() == "exe" {
+                            Button {
+                                model.registerExecutable(file)
+                            } label: {
+                                Image(systemName: "plus.rectangle.on.folder")
+                            }
+                            .accessibilityLabel("Add executable to Madeira library")
+                        }
+                        ShareLink(item: file) {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                        .accessibilityLabel("Share " + file.lastPathComponent)
+                    }
+                    .padding(.vertical, 7)
+                    Divider()
+                }
+            }
+        }
+        .padding(18)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
     }
 }
 '''
