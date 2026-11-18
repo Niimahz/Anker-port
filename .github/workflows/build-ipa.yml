@@ -219,6 +219,10 @@ jobs:
       - name: Build using upstream Madeira toolchain
         run: |
           cd native-src
+          brew list --versions bison >/dev/null || brew install bison
+          BISON_DIR="$(brew --prefix bison)/bin"
+          export BISON_DIR
+          "$BISON_DIR/bison" --version
           bash tools/build-ipa.sh
       - name: Show DXMT compiler diagnostics on failure
         if: failure()
