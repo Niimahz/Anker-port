@@ -61,6 +61,25 @@ jobs:
         run: |
           git clone --filter=blob:none https://github.com/willfaust/Madeira.git native-src
           git -C native-src checkout fbad430410b4075192166172447c859714726de9
+      - name: Validate integration and type-check the Anker UI against Madeira and the iPhone SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_*.py' -v
+          python3 runtime/tools/brand-upstream.py native-src
+          python3 runtime/tools/integrate-upstream.py native-src
+          cd native-src/app/Madeira
+          # The pinned Madeira target contains all Swift files under this directory.
+          # Check the modified file with the other target sources available for name lookup.
+          sources=()
+          while IFS= read -r -d '' file; do
+            sources+=("$file")
+          done < <(find . -name '*.swift' ! -path './MadeiraApp.swift' -print0)
+          xcrun --sdk iphoneos swiftc -frontend -typecheck -parse-as-library \
+            -primary-file MadeiraApp.swift "${sources[@]}" \
+            -module-name Madeira -swift-version 5 -D DEBUG -enable-bare-slash-regex \
+            -target arm64-apple-ios18.0 -sdk "$(xcrun --sdk iphoneos --show-sdk-path)" \
+            -import-objc-header Madeira-Bridging-Header.h
       - name: Prepare Rust iOS dependencies with network retries
         timeout-minutes: 10
         env:
@@ -128,11 +147,6 @@ jobs:
           test -s "$frameworks/StikJIT.framework/Modules/StikJIT.swiftmodule/arm64-apple-ios.swiftmodule"
           printf 'import StikJIT\n' > "$RUNNER_TEMP/anker-stikjit-import.swift"
           xcrun --sdk iphoneos swiftc -typecheck -target arm64-apple-ios26.0 -sdk "$(xcrun --sdk iphoneos --show-sdk-path)" -F "$frameworks" "$RUNNER_TEMP/anker-stikjit-import.swift"
-      - name: Integrate Anker with actual Madeira application
-        run: |
-          python3 runtime/tools/brand-upstream.py native-src
-          python3 runtime/tools/integrate-upstream.py native-src
-          xcrun swiftc -frontend -parse native-src/app/Madeira/MadeiraApp.swift
       - name: Patch pinned DXMT Metal atomic API compatibility
         run: |
           git -C native-src submodule update --init dxmt
