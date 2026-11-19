@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -18,6 +19,17 @@ static inline int anker_unpack(const char *input, const char *root, char *error,
     archive_read_support_format_rar(reader);
     archive_read_support_format_rar5(reader);
     archive_read_support_format_7zip(reader);
+    archive_read_support_format_tar(reader);
+    archive_read_support_filter_gzip(reader);
+    // Raw accepts arbitrary bytes, so only offer it for a gzip stream.
+    unsigned char signature[3];
+    FILE *probe = fopen(input, "rb");
+    if (probe) {
+        size_t n = fread(signature, 1, sizeof(signature), probe);
+        fclose(probe);
+        if (n == 3 && signature[0] == 0x1f && signature[1] == 0x8b && signature[2] == 8)
+            archive_read_support_format_raw(reader);
+    }
     const char *reason = NULL;
     int fd = -1, count = 0;
     if (archive_read_open_filename(reader, input, 65536) != ARCHIVE_OK) goto fail;
@@ -26,6 +38,22 @@ static inline int anker_unpack(const char *input, const char *root, char *error,
     while ((rc = archive_read_next_header(reader, &entry)) == ARCHIVE_OK) {
         const char *name = archive_entry_pathname_utf8(entry);
         if (!name) name = archive_entry_pathname(entry);
+        char single_name[NAME_MAX + 1];
+        if (archive_format(reader) == ARCHIVE_FORMAT_RAW) {
+            if (archive_filter_code(reader, 0) != ARCHIVE_FILTER_GZIP) {
+                reason = "Invalid gzip stream"; goto fail;
+            }
+            if (name && !strcmp(name, "data")) {
+                const char *base = strrchr(input, '/');
+                base = base ? base + 1 : input;
+                size_t length = strlen(base);
+                if (length > 3 && length - 3 <= NAME_MAX && !strcasecmp(base + length - 3, ".gz")) {
+                    memcpy(single_name, base, length - 3);
+                    single_name[length - 3] = 0;
+                    name = single_name;
+                }
+            }
+        }
         mode_t type = archive_entry_filetype(entry);
         if (!name || !*name || *name == '/' || *name == '\\' || strchr(name, ':') ||
             archive_entry_hardlink(entry) || archive_entry_symlink(entry) ||

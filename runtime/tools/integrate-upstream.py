@@ -65,11 +65,13 @@ private final class AnkerDownloadModel: ObservableObject {
 
     func isArchive(_ url: URL) -> Bool {
         if url.hasDirectoryPath { return false }
-        if ["zip", "rar", "7z"].contains(url.pathExtension.lowercased()) { return true }
+        if ["zip", "rar", "7z", "tar", "gz", "tgz"].contains(url.pathExtension.lowercased()) { return true }
         guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
         defer { try? handle.close() }
-        let prefix = Array((try? handle.read(upToCount: 8)) ?? Data())
-        return prefix.starts(with: [0x50, 0x4b, 3, 4]) ||
+        let prefix = Array((try? handle.read(upToCount: 512)) ?? Data())
+        return prefix.starts(with: [0x1f, 0x8b, 8]) ||
+            prefix.dropFirst(257).starts(with: "ustar".utf8) ||
+            prefix.starts(with: [0x50, 0x4b, 3, 4]) ||
             prefix.starts(with: [0x52, 0x61, 0x72, 0x21]) ||
             prefix.starts(with: [0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c])
     }
