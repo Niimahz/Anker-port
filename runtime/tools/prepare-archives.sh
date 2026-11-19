@@ -12,6 +12,8 @@ git clone -q --depth 1 --branch v3.8.7 https://github.com/libarchive/libarchive.
 lzma="$(find "$build/xz-build" -name liblzma.a -print -quit)"
 cmake -S "$build/archive" -B "$build/build" "${common[@]}" \
   -DLIBLZMA_LIBRARY="$lzma" -DLIBLZMA_INCLUDE_DIR="$build/xz/src/liblzma/api" \
+  -DENABLE_CAT=OFF -DENABLE_TAR=OFF -DENABLE_CPIO=OFF -DENABLE_UNZIP=OFF -DENABLE_INSTALL=OFF \
+  -DHAVE_FORK=0 -DHAVE_VFORK=0 -DHAVE_POSIX_SPAWN=0 -DHAVE_POSIX_SPAWNP=0 \
   -DENABLE_LZMA=ON -DENABLE_ZLIB=ON -DENABLE_OPENSSL=OFF -DENABLE_NETTLE=OFF \
   -DENABLE_MBEDTLS=OFF -DENABLE_LIBB2=OFF -DENABLE_ZSTD=OFF -DENABLE_LZ4=OFF \
   -DENABLE_LZO=OFF -DENABLE_BZip2=OFF -DENABLE_LIBXML2=OFF -DENABLE_EXPAT=OFF \
