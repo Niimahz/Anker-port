@@ -40,7 +40,119 @@ struct PortMark: View {
     }
 }
 
+struct PortPress: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.975 : 1)
+            .opacity(configuration.isPressed ? 0.82 : 1)
+            .animation(reduceMotion ? nil : .spring(duration: 0.24, bounce: 0.14), value: configuration.isPressed)
+    }
+}
+
+// Machined copper contours, drawn once per size and composited as a single layer.
+struct PortContours: View {
+    var body: some View {
+        Canvas { ctx, size in
+            let unit = max(size.width, size.height)
+            let center = CGPoint(x: size.width * 0.77, y: size.height * 0.45)
+            for ring in 0..<38 {
+                let depth = Double(ring) / 37
+                var curve = Path()
+                for step in 0...112 {
+                    let t = Double(step) * 2 * Double.pi / 112
+                    let wave = 1.0 + 0.16 * sin(3 * t + depth * 2)
+                    let radius = (0.19 + 0.15 * depth) * wave
+                    let x = radius * cos(t)
+                    let y = radius * sin(t) * 0.70
+                    let point = CGPoint(x: center.x + unit * CGFloat(x + y * 0.44),
+                                        y: center.y + unit * CGFloat(y - x * 0.48 + depth * 0.15))
+                    if step == 0 { curve.move(to: point) } else { curve.addLine(to: point) }
+                }
+                curve.closeSubpath()
+                ctx.stroke(curve, with: .linearGradient(
+                    Gradient(colors: [Color(red: 0.46, green: 0.13, blue: 0.07), PortStyle.signal,
+                                      Color(red: 1, green: 0.87, blue: 0.69), Color(white: 0.20)]),
+                    startPoint: .zero, endPoint: CGPoint(x: size.width, y: size.height * 0.35)),
+                    lineWidth: 0.8 + CGFloat(depth) * 0.7)
+            }
+        }.accessibilityHidden(true).allowsHitTesting(false)
+    }
+}
+
+struct PortPageHeading: View {
+    let title: LocalizedStringKey
+    let symbol: String
+    var body: some View {
+        HStack(alignment: .bottom) {
+            Text(title).font(.system(.largeTitle, design: .rounded, weight: .heavy))
+                .foregroundStyle(.white).accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 12)
+            Image(systemName: symbol).font(.title2.bold()).foregroundStyle(PortStyle.signal)
+                .accessibilityHidden(true)
+        }.padding(20).frame(minHeight: 104, alignment: .bottom)
+        .background {
+            ZStack {
+                Color(red: 0.13, green: 0.10, blue: 0.11)
+                PortContours().opacity(0.36)
+                LinearGradient(colors: [.black.opacity(0.68), .clear], startPoint: .leading, endPoint: .trailing)
+            }
+        }.clipShape(RoundedRectangle(cornerRadius: 20))
+    }
+}
+
+struct PortActivity: View {
+    let label: String
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var body: some View {
+        HStack(spacing: 9) {
+            if reduceMotion { Image(systemName: "hourglass") }
+            else { ProgressView().controlSize(.small).tint(PortStyle.accent) }
+            Text(label).font(.footnote.weight(.semibold))
+        }.foregroundStyle(PortStyle.accent).accessibilityElement(children: .combine)
+    }
+}
+
+private struct PortSpotlight: View {
+    let entry: LibraryEntry?
+    let action: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Spacer(minLength: 92)
+            Text(entry?.title ?? "Your game library")
+                .font(.system(.largeTitle, design: .rounded, weight: .heavy)).lineLimit(3)
+                .foregroundStyle(.white).accessibilityAddTraits(.isHeader)
+            Button(action: action) {
+                Label(entry == nil ? "Open library" : "Play game", systemImage: entry == nil ? "square.grid.2x2.fill" : "play.fill")
+                    .font(.headline).padding(.horizontal, 20).frame(minHeight: 44)
+                    .foregroundStyle(.black).background(PortStyle.signal, in: Capsule())
+            }.buttonStyle(PortPress())
+        }.padding(22).frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            GeometryReader { g in
+                ZStack {
+                    Color(red: 0.10, green: 0.09, blue: 0.10)
+                    if let entry {
+                        LibraryArtwork(entry: entry)
+                            .frame(width: g.size.width, height: g.size.height).clipped()
+                    } else { PortContours() }
+                    LinearGradient(colors: [.clear, .black.opacity(0.87)], startPoint: .topTrailing, endPoint: .bottomLeading)
+                }.frame(width: g.size.width, height: g.size.height).clipped()
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 25))
+        .overlay { RoundedRectangle(cornerRadius: 25).strokeBorder(.white.opacity(0.16)) }
+        .shadow(color: .black.opacity(0.18), radius: 10, y: 5)
+        .scrollTransition(.interactive, axis: .vertical) { view, phase in
+            view.scaleEffect(reduceMotion || phase.isIdentity ? 1 : 0.97)
+        }
+    }
+}
+
 struct PortDock: View {
+    @Namespace private var selection
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let tab: Int
     let select: (Int) -> Void
     private let items = [(4,"Home","house.fill"), (0,"Library","square.grid.2x2.fill"), (2,"Downloads","arrow.down.to.line"), (3,"Browser","safari"), (1,"Settings","slider.horizontal.3")]
@@ -54,10 +166,17 @@ struct PortDock: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: 48)
                     .foregroundStyle(tab == item.0 ? Color.black : Color.white.opacity(0.8))
-                    .background(tab == item.0 ? PortStyle.signal : Color.clear, in: RoundedRectangle(cornerRadius: 13))
-                }.buttonStyle(.plain).accessibilityAddTraits(tab == item.0 ? .isSelected : [])
+                    .background {
+                        if tab == item.0 {
+                            RoundedRectangle(cornerRadius: 13).fill(PortStyle.signal)
+                                .matchedGeometryEffect(id: "tab", in: selection)
+                        }
+                    }
+                }.buttonStyle(PortPress()).accessibilityAddTraits(tab == item.0 ? .isSelected : [])
             }
-        }.padding(5).frame(maxWidth: 540)
+        }.animation(reduceMotion ? nil : .spring(duration: 0.34, bounce: 0.17), value: tab)
+        .sensoryFeedback(.selection, trigger: tab)
+        .padding(5).frame(maxWidth: 540)
         .background(Color(white: 0.105), in: RoundedRectangle(cornerRadius: 18))
         .padding(.horizontal, 12).padding(.vertical, 4)
         .frame(maxWidth: .infinity).background(PortStyle.ground)
@@ -65,6 +184,7 @@ struct PortDock: View {
 }
 
 struct AnkerHome: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject var library: LibraryModel
     let play: (LibraryEntry) -> Void
     let select: (Int) -> Void
@@ -73,40 +193,16 @@ struct AnkerHome: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 let latest = games.max { ($0.lastPlayed ?? .distantPast) < ($1.lastPlayed ?? .distantPast) }
-                VStack(alignment: .leading, spacing: 16) {
-                    Spacer(minLength: 76)
-                    Text(latest?.title ?? "Your game library")
-                        .font(.system(.largeTitle, design: .rounded, weight: .heavy))
-                        .lineLimit(3).foregroundStyle(.white)
-                    Button {
-                        if let latest { play(latest) } else { select(0) }
-                    } label: {
-                        Label(latest == nil ? "Open library" : "Play game", systemImage: latest == nil ? "square.grid.2x2.fill" : "play.fill")
-                            .font(.headline).padding(.horizontal, 18).frame(minHeight: 44)
-                            .foregroundStyle(.black).background(PortStyle.signal, in: Capsule())
-                    }.buttonStyle(.plain)
-                }.padding(22).frame(maxWidth: .infinity, alignment: .leading)
-                .background {
-                    GeometryReader { g in
-                        ZStack(alignment: .trailing) {
-                            Color(white: 0.09)
-                            if let latest {
-                                LibraryArtwork(entry: latest).frame(width: g.size.width * 0.63, height: g.size.height).clipped()
-                            } else {
-                                PortMark().frame(width: g.size.width * 0.6, height: g.size.height).opacity(0.7)
-                            }
-                            LinearGradient(colors: [Color(white: 0.09), .black.opacity(0.08)], startPoint: .leading, endPoint: .trailing)
-                            LinearGradient(colors: [.clear, .black.opacity(0.72)], startPoint: .top, endPoint: .bottom)
-                        }.frame(width: g.size.width, height: g.size.height)
-                    }
-                }.clipShape(RoundedRectangle(cornerRadius: 24))
+                PortSpotlight(entry: latest) {
+                    if let latest { play(latest) } else { select(0) }
+                }
                 HStack(spacing: 10) {
                     shortcut("Downloads", "arrow.down.to.line", 2)
                     shortcut("Browser", "safari", 3)
                 }
                 Button { select(0) } label: {
                     HStack { Text("Library").font(.title2.bold()); Spacer(); Text(String(games.count)).monospacedDigit(); Image(systemName: "arrow.up.right") }
-                }.buttonStyle(.plain)
+                }.buttonStyle(PortPress())
                 if !games.isEmpty {
                     ScrollView(.horizontal) {
                         LazyHStack(alignment: .top, spacing: 12) {
@@ -116,7 +212,11 @@ struct AnkerHome: View {
                                         LibraryArtwork(entry: entry).frame(width: 118, height: 157).clipShape(RoundedRectangle(cornerRadius: 12))
                                         Text(entry.title).font(.subheadline.bold()).lineLimit(2)
                                     }.frame(width: 118, alignment: .leading)
-                                }.buttonStyle(.plain)
+                                    .scrollTransition(.interactive, axis: .horizontal) { view, phase in
+                                        view.scaleEffect(reduceMotion || phase.isIdentity ? 1 : 0.94)
+                                            .opacity(reduceMotion || phase.isIdentity ? 1 : 0.8)
+                                    }
+                                }.buttonStyle(PortPress())
                             }
                         }
                     }.scrollIndicators(.hidden)
@@ -130,7 +230,7 @@ struct AnkerHome: View {
                 Image(systemName: icon).font(.title2).foregroundStyle(PortStyle.accent)
                 Text(title).font(.headline)
             }.padding(16).frame(maxWidth: .infinity, alignment: .leading).portPanel()
-        }.buttonStyle(.plain)
+        }.buttonStyle(PortPress())
     }
 }
 
@@ -239,7 +339,7 @@ struct AnkerBrowser: View {
                 AnkerWebPage(page: session.page)
             } else {
                 VStack(alignment: .leading, spacing: 18) {
-                    Text("Browser").font(.system(.largeTitle, design: .rounded, weight: .heavy))
+                    PortPageHeading(title: "Browser", symbol: "safari")
                     ForEach(["store.steampowered.com", "gog.com", "itch.io"], id: \.self) { host in
                         Button { session.address = host; session.openAddress() } label: {
                             HStack {
@@ -248,7 +348,7 @@ struct AnkerBrowser: View {
                                 Spacer()
                                 Image(systemName: "arrow.up.right")
                             }.padding(16).portPanel()
-                        }.buttonStyle(.plain)
+                        }.buttonStyle(PortPress())
                     }
                 }.padding(18).frame(maxWidth: 700).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }

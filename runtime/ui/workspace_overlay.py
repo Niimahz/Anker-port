@@ -47,10 +47,10 @@ def install(root: Path):
                     Text("Anker Port").font(.system(.headline, design: .rounded, weight: .heavy))
                 }.accessibilityElement(children: .combine)
             }""")
-    change("                desktopButton\n                // The library's sections", """                Text("Library").font(.system(.largeTitle, design: .rounded, weight: .heavy)).accessibilityAddTraits(.isHeader)
+    change("                desktopButton\n                // The library's sections", """                PortPageHeading(title: "Library", symbol: "square.grid.2x2.fill")
                 desktopButton
                 // The library's sections""")
-    change("desktop: { AnyView(desktopButton) }", 'desktop: { AnyView(VStack(alignment: .leading, spacing: 14) { Text("Library").font(.largeTitle.bold()); desktopButton }) }')
+    change("desktop: { AnyView(desktopButton) }", 'desktop: { AnyView(VStack(alignment: .leading, spacing: 14) { PortPageHeading(title: "Library", symbol: "square.grid.2x2.fill"); desktopButton }) }')
     change("                    }.padding(4)\n                }\n            }.foregroundStyle(.primary)", """                    }.padding(9).frame(maxWidth: .infinity, alignment: .leading).portPanel()
                 }
             }.foregroundStyle(.primary)""")
@@ -63,7 +63,7 @@ def install(root: Path):
     end = settings.index('    private func summary', start)
     settings = settings[:start] + r'''        ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                Text("Settings").font(.system(.largeTitle, design: .rounded, weight: .heavy)).accessibilityAddTraits(.isHeader)
+                PortPageHeading(title: "Settings", symbol: "slider.horizontal.3")
                 LibraryStatus().padding(16).frame(maxWidth: .infinity, alignment: .leading).portPanel()
                 ForEach(Array(SettingsPages.groups.enumerated()), id: \.offset) { _, group in
                     let pages = group.1.filter(\.shown)
@@ -81,7 +81,7 @@ def install(root: Path):
                                         if let value = summary(page) { Text(value).font(.caption).foregroundStyle(.secondary) }
                                         Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
                                     }.padding(.horizontal, 14).padding(.vertical, 9).contentShape(Rectangle())
-                                }.buttonStyle(.plain)
+                                }.buttonStyle(PortPress())
                                 if page != pages.last { Divider().padding(.leading, 58) }
                             }
                         }.portPanel()

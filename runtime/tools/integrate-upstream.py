@@ -405,6 +405,8 @@ private struct AnkerSteamGame: Decodable, Identifiable {
 struct AnkerNativeDownloads: View {
     @ObservedObject private var model = AnkerDownloadModel.shared
     private enum Pane: String, CaseIterable { case files = "Files", tools = "Game tools" }
+    @Namespace private var paneSelection
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pane = Pane.files
     @State private var pendingDelete: URL?
     @State private var selectingGameFolder = false
@@ -415,9 +417,22 @@ struct AnkerNativeDownloads: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 header
-                Picker("Downloads view", selection: $pane) {
-                    ForEach(Pane.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                }.pickerStyle(.segmented)
+                HStack(spacing: 4) {
+                    ForEach(Pane.allCases, id: \.self) { option in
+                        Button {
+                            withAnimation(reduceMotion ? nil : .spring(duration: 0.3)) { pane = option }
+                        } label: {
+                            Label(option.rawValue, systemImage: option == .files ? "tray.full" : "wrench.and.screwdriver")
+                                .font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity, minHeight: 44)
+                                .foregroundStyle(option == pane ? Color.black : Color.primary)
+                                .background {
+                                    if pane == option {
+                                        Capsule().fill(PortStyle.signal).matchedGeometryEffect(id: "pane", in: paneSelection)
+                                    }
+                                }
+                        }.buttonStyle(PortPress()).accessibilityAddTraits(option == pane ? .isSelected : [])
+                    }
+                }.padding(4).background(PortStyle.panel, in: Capsule())
                 if pane == .files {
                     downloadCenter
                     downloadsList
@@ -531,8 +546,11 @@ struct AnkerNativeDownloads: View {
             .disabled(model.busy || model.validatedURL == nil)
             .opacity(model.busy || model.validatedURL == nil ? 0.55 : 1)
             .accessibilityIdentifier("anker.downloads.start")
-            Text(model.status)
-                .font(.footnote)
+            if model.busy {
+                PortActivity(label: model.status)
+            } else {
+                Text(model.status).font(.footnote)
+            }
             if model.expectedBytes > 0 {
                 Text("Expected: " + ByteCountFormatter.string(fromByteCount: model.expectedBytes, countStyle: .file))
                     .font(.caption).foregroundStyle(.secondary)
@@ -684,8 +702,13 @@ struct AnkerNativeDownloads: View {
                         if file.hasDirectoryPath {
                             Button("Import game") { model.importGameFolder(file) }
                         } else if model.isArchive(file) {
-                            Button(model.extracting.contains(file) ? "Extracting…" : "Extract") { model.extract(file) }
-                                .disabled(model.extracting.contains(file))
+                            if model.extracting.contains(file) {
+                                PortActivity(label: "Extracting…")
+                            } else {
+                                Button { model.extract(file) } label: {
+                                    Label("Extract", systemImage: "shippingbox")
+                                }.buttonStyle(.bordered)
+                            }
                         }
                         Spacer()
                         Button("Delete", role: .destructive) { pendingDelete = file }
