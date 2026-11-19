@@ -472,6 +472,22 @@ struct AnkerNativeDownloads: View {
         }
     }
 
+    // A user-initiated, copyable diagnostic snapshot. Never include URLs, file paths,
+    // download cookies or executable arguments in the shared report.
+    private var ankerRuntimeDiagnostic: String {
+        let jitState = jit.busy ? "Connecting" : (jit.status ?? "Not checked")
+        return [
+            "Anker Port runtime diagnostic",
+            "Generated: \\(Date().formatted(.iso8601))",
+            "Library entries: \\(library.entries.count)",
+            "JIT method: \\(jit.resolvedMethod.title)",
+            "JIT state: \\(jitState)",
+            "JIT error: \\(jit.error ?? "None reported")",
+            "Library error: \\(library.error ?? "None reported")",
+            "Note: This is a status snapshot, not proof that an EXE launched."
+        ].joined(separator: "\\n")
+    }
+
     private var runtimeHealth: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Runtime health", systemImage: "cpu.fill")
@@ -505,6 +521,10 @@ struct AnkerNativeDownloads: View {
                     .font(.caption)
                     .foregroundStyle(.red)
             }
+            ShareLink(item: ankerRuntimeDiagnostic) {
+                Label("Share runtime diagnostic", systemImage: "square.and.arrow.up")
+            }
+            .accessibilityIdentifier("anker.runtime.share-diagnostic")
             Text("JIT status applies to your next game session.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
