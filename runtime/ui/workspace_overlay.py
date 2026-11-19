@@ -37,6 +37,68 @@ def install(root: Path):
     if settings.count(first) != 1:
         raise ValueError("Unexpected Credits layout")
     credit = '            MadeiraCredit(name: "Nima HZ", handle: "Niimahz", role: "Created Anker Port")'
+    # Hide the system bar in each tab so a sheet or a pushed screen keeps its own controls.
+    source = source.replace(".tabItem {", ".toolbar(.hidden, for: .tabBar)\n                .tabItem {")
+    change("        .tint(.teal)", """        .safeAreaInset(edge: .bottom, spacing: 0) { PortDock(tab: tab, select: switchTab) }
+        .tint(PortStyle.accent)""")
+    change("            LibraryLargeTitle()", """            ToolbarItem(placement: .topBarLeading) {
+                HStack(spacing: 7) {
+                    PortMark().frame(width: 30, height: 29)
+                    Text("Anker Port").font(.system(.headline, design: .rounded, weight: .heavy))
+                }.accessibilityElement(children: .combine)
+            }""")
+    change("                desktopButton\n                // The library's sections", """                Text("Library").font(.system(.largeTitle, design: .rounded, weight: .heavy)).accessibilityAddTraits(.isHeader)
+                desktopButton
+                // The library's sections""")
+    change("desktop: { AnyView(desktopButton) }", 'desktop: { AnyView(VStack(alignment: .leading, spacing: 14) { Text("Library").font(.largeTitle.bold()); desktopButton }) }')
+    change("                    }.padding(4)\n                }\n            }.foregroundStyle(.primary)", """                    }.padding(9).frame(maxWidth: .infinity, alignment: .leading).portPanel()
+                }
+            }.foregroundStyle(.primary)""")
+    source = source.replace(".background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())", ".background(PortStyle.ground.ignoresSafeArea())")
+    change('            .navigationTitle("Game details")', '''            .scrollContentBackground(.hidden).background(PortStyle.ground)
+            .tint(PortStyle.accent)
+            .navigationTitle("Game details")''')
+    change('            .background(pending || configuration.isPressed ? Color(uiColor: .darkGray) : .accentColor,', '''            .background(pending || configuration.isPressed ? Color(uiColor: .darkGray) : Color(red: 0.66, green: 0.22, blue: 0.055),''')
+    start = settings.index('        Form {', settings.index('struct SettingsPagesList: View'))
+    end = settings.index('    private func summary', start)
+    settings = settings[:start] + r'''        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("Settings").font(.system(.largeTitle, design: .rounded, weight: .heavy)).accessibilityAddTraits(.isHeader)
+                LibraryStatus().padding(16).frame(maxWidth: .infinity, alignment: .leading).portPanel()
+                ForEach(Array(SettingsPages.groups.enumerated()), id: \.offset) { _, group in
+                    let pages = group.1.filter(\.shown)
+                    if !pages.isEmpty {
+                        if let title = group.0 { Text(title).font(.headline).accessibilityAddTraits(.isHeader) }
+                        VStack(spacing: 0) {
+                            ForEach(pages, id: \.self) { page in
+                                NavigationLink { SettingsPageView(page: page, startDock: startDock) } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: page.symbol).frame(width: 32, height: 32)
+                                            .foregroundStyle(PortStyle.accent)
+                                            .background(PortStyle.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 9))
+                                        Text(page.title).font(.body.weight(.medium))
+                                        Spacer()
+                                        if let value = summary(page) { Text(value).font(.caption).foregroundStyle(.secondary) }
+                                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                                    }.padding(.horizontal, 14).padding(.vertical, 9).contentShape(Rectangle())
+                                }.buttonStyle(.plain)
+                                if page != pages.last { Divider().padding(.leading, 58) }
+                            }
+                        }.portPanel()
+                    }
+                }
+            }.padding(18).frame(maxWidth: 700).frame(maxWidth: .infinity)
+        }.background(PortStyle.ground)
+    }
+
+''' + settings[end:]
+    settings = settings.replace('Form { content }', 'Form { content }.scrollContentBackground(.hidden).background(PortStyle.ground).tint(PortStyle.accent)')
+    onboarding = root / "Onboarding.swift"
+    welcome = onboarding.read_text().replace('            .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())', '            .background(PortStyle.ground.ignoresSafeArea()).tint(PortStyle.accent)')
+    welcome = welcome.replace('                        Text("Step ', '                        PortMark().frame(width: 56, height: 48)\n                        Text("Step ')
+    onboarding.write_text(welcome)
+    icon = root / "Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png"
+    icon.write_bytes(Path(__file__).with_name("PortIcon.png").read_bytes())
     pages.write_text(settings.replace(first, credit + "\n" + first))
     path.write_text(source)
 

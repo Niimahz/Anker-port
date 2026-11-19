@@ -430,7 +430,7 @@ struct AnkerNativeDownloads: View {
             .padding(18)
         }
         .scrollDismissesKeyboard(.interactively)
-        .background(Color(uiColor: .systemGroupedBackground))
+        .background(PortStyle.ground)
         .onAppear { model.refresh() }
         .alert("Delete download?", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }), presenting: pendingDelete) { url in
             Button("Delete", role: .destructive) { model.deleteDownload(url) }
@@ -448,19 +448,13 @@ struct AnkerNativeDownloads: View {
         }
     }
     private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("Downloads", systemImage: "arrow.down.circle.fill")
-                .font(.largeTitle.bold())
-            Text(String(library.entries.count) + " games in library")
-                .font(.subheadline).foregroundStyle(.secondary)
+        HStack {
+            Text("Downloads").font(.system(.largeTitle, design: .rounded, weight: .heavy))
+            Spacer()
+            Text(String(model.files.count)).font(.title3.monospacedDigit().bold())
+                .foregroundStyle(PortStyle.accent)
+                .accessibilityLabel("Downloaded files: " + String(model.files.count))
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(24)
-        .background(
-            LinearGradient(colors: [.teal.opacity(0.13), .purple.opacity(0.06)],
-                           startPoint: .topLeading, endPoint: .bottomTrailing),
-            in: RoundedRectangle(cornerRadius: 22)
-        )
     }
 
     private var runtimeHealth: some View {
@@ -501,7 +495,7 @@ struct AnkerNativeDownloads: View {
                 .foregroundStyle(.secondary)
         }
         .padding(18)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .portPanel()
     }
 
     private var downloadCenter: some View {
@@ -533,7 +527,7 @@ struct AnkerNativeDownloads: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.white)
-            .background(.teal, in: RoundedRectangle(cornerRadius: 13))
+            .background(Color(red: 0.66, green: 0.22, blue: 0.055), in: RoundedRectangle(cornerRadius: 13))
             .disabled(model.busy || model.validatedURL == nil)
             .opacity(model.busy || model.validatedURL == nil ? 0.55 : 1)
             .accessibilityIdentifier("anker.downloads.start")
@@ -554,7 +548,7 @@ struct AnkerNativeDownloads: View {
             }
         }
         .padding(18)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .portPanel()
     }
 
     private var gameImport: some View {
@@ -601,7 +595,7 @@ struct AnkerNativeDownloads: View {
                 .foregroundStyle(.secondary)
         }
         .padding(18)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .portPanel()
     }
 
     private var steamLookup: some View {
@@ -637,7 +631,7 @@ struct AnkerNativeDownloads: View {
                 }
             }
             .padding(18)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+            .portPanel()
     }
 
     private func displayName(_ file: URL) -> String {
@@ -667,7 +661,7 @@ struct AnkerNativeDownloads: View {
                     HStack(spacing: 12) {
                         Image(systemName: file.hasDirectoryPath ? "folder.fill" : "doc.zipper")
                             .font(.title3)
-                            .foregroundStyle(.teal)
+                            .foregroundStyle(PortStyle.accent)
                         Text(displayName(file))
                             .font(.subheadline)
                             .lineLimit(2)
@@ -705,7 +699,7 @@ struct AnkerNativeDownloads: View {
             }
         }
         .padding(18)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .portPanel()
     }
 }
 '''
