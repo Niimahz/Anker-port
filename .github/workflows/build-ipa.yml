@@ -199,6 +199,35 @@ jobs:
           assert "Pass it when the toolchain defines it" not in script.read_text()
           print("Disabled upstream Xcode 27 shader rewrite for macos-15")
           PY
+      - name: Build and validate Wine i386 resources before the full IPA build
+        working-directory: native-src
+        run: |
+          set -euo pipefail
+          brew install bison flex meson ninja
+          export PATH="$(brew --prefix bison)/bin:$(brew --prefix flex)/bin:$PATH"
+          git submodule update --init --recursive wine dxmt
+          tools/build/setup-llvm-mingw.sh
+          # Exercise the exact missing DLL before compiling the rest of the farm.
+          build/wine-i386/build.sh ntdll
+          check_i386_dll() {
+            python3 - "$1" <<'PYTHON'
+          import struct
+          import sys
+          from pathlib import Path
+          data = Path(sys.argv[1]).read_bytes()
+          pe = struct.unpack_from("<I", data, 60)[0]
+          assert data[:2] == b"MZ" and data[pe:pe+4] == b"PE\0\0", sys.argv[1]
+          assert struct.unpack_from("<H", data, pe + 4)[0] == 0x14c, sys.argv[1]
+          assert struct.unpack_from("<H", data, pe + 22)[0] & 0x2000, sys.argv[1]
+          PYTHON
+          }
+          check_i386_dll app/Madeira/i386-windows/ntdll.dll
+          xcodebuild -downloadComponent MetalToolchain
+          tools/build/build-shader-headers.sh
+          build/wine-i386/build.sh
+          for dll in ntdll kernel32 user32 d3d11 dxgi; do
+            check_i386_dll "app/Madeira/i386-windows/$dll.dll"
+          done
       - name: Initialize FEX submodule before restoring its build cache
         run: |
           git -C native-src submodule update --init --depth 1 FEX
