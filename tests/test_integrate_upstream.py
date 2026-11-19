@@ -18,7 +18,7 @@ class IntegrationTests(unittest.TestCase):
             self.assertIn("runWineFullSequence()", first)
             self.assertIn("AnkerNativeDownloads", first)
             self.assertNotIn("}\n                        .foregroundStyle(.secondary)", first)
-            self.assertIn("URLSession.shared.download", first)
+            self.assertIn("session.download(from: url)", first)
             self.assertIn("LibraryModel.inspect(executable)", first)
             self.assertIn("library.save(entry)", first)
             self.assertIn("LibraryModel.drive", first)

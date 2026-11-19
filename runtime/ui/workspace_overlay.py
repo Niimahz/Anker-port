@@ -30,6 +30,14 @@ def install(root: Path):
     change('.frame(width: 0, height: 0))\n        // Each tab', '.frame(width: 0, height: 0) } }\n        // Each tab')
     change('else { settingsToolbar }', 'else if tab == 1 { settingsToolbar }')
     change('switchTab(to: 1 - tab)', 'switchTab(to: [4: 0, 0: 2, 2: 3, 3: 1, 1: 4][tab] ?? 4)')
+    change('settingsShow("credits", "thanks",', 'settingsShow("credits", "Nima HZ", "Niimahz", "thanks",')
+    pages = root / "SettingsPages.swift"
+    settings = pages.read_text()
+    first = '            MadeiraCredit(name: "Will Faust"'
+    if settings.count(first) != 1:
+        raise ValueError("Unexpected Credits layout")
+    credit = '            MadeiraCredit(name: "Nima HZ", handle: "Niimahz", role: "Created Anker Port")'
+    pages.write_text(settings.replace(first, credit + "\n" + first))
     path.write_text(source)
 
     # Keep lookup keys and the on-disk format stable. SwiftUI resolves display

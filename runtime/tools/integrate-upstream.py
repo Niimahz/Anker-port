@@ -45,7 +45,10 @@ private final class AnkerDownloadModel: ObservableObject {
     }
 
     var validatedURL: URL? {
-        guard let url = URL(string: address.trimmingCharacters(in: .whitespacesAndNewlines)),
+        let input = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !input.isEmpty, !input.contains(where: { $0.isWhitespace }) else { return nil }
+        let candidate = URLComponents(string: input)?.scheme == nil ? "https://" + input : input
+        guard let url = URL(string: candidate),
               let scheme = url.scheme?.lowercased(),
               scheme == "https",
               url.host != nil, url.user == nil, url.password == nil else { return nil }
@@ -329,9 +332,18 @@ private final class AnkerDownloadModel: ObservableObject {
         status = "Downloading " + url.lastPathComponent
         defer { busy = false; refresh() }
         do {
-            let (temporary, response) = try await URLSession.shared.download(from: url)
+            let configuration = URLSessionConfiguration.ephemeral
+            let cookies = await WKWebsiteDataStore.default().httpCookieStore.allCookies()
+            for cookie in cookies { configuration.httpCookieStorage?.setCookie(cookie) }
+            let session = URLSession(configuration: configuration)
+            defer { session.finishTasksAndInvalidate() }
+            let (temporary, response) = try await session.download(from: url)
             guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-                status = "The server returned an unsuccessful response."
+                status = "Download failed. HTTP " + String((response as? HTTPURLResponse)?.statusCode ?? 0)
+                return
+            }
+            if ["text/html", "application/xhtml+xml"].contains(response.mimeType?.lowercased() ?? "") {
+                status = "This link opened a webpage. Open it in Browser and tap the site’s download button."
                 return
             }
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -370,6 +382,8 @@ private struct AnkerSteamGame: Decodable, Identifiable {
 
 struct AnkerNativeDownloads: View {
     @ObservedObject private var model = AnkerDownloadModel.shared
+    private enum Pane: String, CaseIterable { case files = "Files", tools = "Game tools" }
+    @State private var pane = Pane.files
     @State private var pendingDelete: URL?
     @State private var selectingGameFolder = false
     @ObservedObject private var jit = JITCoordinator.shared
@@ -379,25 +393,27 @@ struct AnkerNativeDownloads: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 header
-                runtimeHealth
-                downloadCenter
-                gameImport
-                steamAndFiles
-
-                Label("Downloads are saved to Documents/AnkerDownloads. ZIP, RAR and 7z downloads extract automatically. Import the extracted folder to add a game.",
-                      systemImage: "info.circle")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 4)
+                Picker("Downloads view", selection: $pane) {
+                    ForEach(Pane.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                }.pickerStyle(.segmented)
+                if pane == .files {
+                    downloadCenter
+                    downloadsList
+                } else {
+                    gameImport
+                    steamLookup
+                    runtimeHealth
+                }
             }
             .padding(18)
         }
+        .scrollDismissesKeyboard(.interactively)
         .background(Color(uiColor: .systemGroupedBackground))
         .onAppear { model.refresh() }
         .alert("Delete download?", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }), presenting: pendingDelete) { url in
             Button("Delete", role: .destructive) { model.deleteDownload(url) }
             Button("Cancel", role: .cancel) {}
-        } message: { url in Text(url.lastPathComponent) }
+        } message: { url in Text(displayName(url)) }
         .fileImporter(isPresented: $selectingGameFolder,
                       allowedContentTypes: [.folder],
                       allowsMultipleSelection: false) { result in
@@ -475,7 +491,8 @@ struct AnkerNativeDownloads: View {
                 .autocorrectionDisabled()
                 .keyboardType(.URL)
                 .textContentType(.URL)
-                .submitLabel(.done)
+                .submitLabel(.go)
+                .onSubmit { Task { await model.download() } }
                 .padding(14)
                 .background(.quaternary.opacity(0.55), in: RoundedRectangle(cornerRadius: 12))
                 .accessibilityIdentifier("anker.downloads.url")
@@ -565,8 +582,7 @@ struct AnkerNativeDownloads: View {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
     }
 
-    private var steamAndFiles: some View {
-        VStack(alignment: .leading, spacing: 12) {
+    private var steamLookup: some View {
             VStack(alignment: .leading, spacing: 10) {
                 Label("Steam lookup", systemImage: "magnifyingglass").font(.headline)
                 TextField("Find a game on Steam", text: $model.steamQuery)
@@ -598,7 +614,19 @@ struct AnkerNativeDownloads: View {
                     }
                 }
             }
-            Divider()
+            .padding(18)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+    }
+
+    private func displayName(_ file: URL) -> String {
+        let name = file.lastPathComponent
+        guard name.count > 37, UUID(uuidString: String(name.prefix(36))) != nil,
+              name.dropFirst(36).first == "-" else { return name }
+        return String(name.dropFirst(37))
+    }
+
+    private var downloadsList: some View {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Label("Downloaded files", systemImage: "folder.fill").font(.headline)
                 Spacer()
@@ -615,10 +643,10 @@ struct AnkerNativeDownloads: View {
             } else {
                 ForEach(model.files, id: \.path) { file in
                     HStack(spacing: 12) {
-                        Image(systemName: "doc.zipper")
+                        Image(systemName: file.hasDirectoryPath ? "folder.fill" : "doc.zipper")
                             .font(.title3)
                             .foregroundStyle(.teal)
-                        Text(file.lastPathComponent)
+                        Text(displayName(file))
                             .font(.subheadline)
                             .lineLimit(2)
                         Spacer(minLength: 8)
