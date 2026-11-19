@@ -157,13 +157,33 @@ private final class AnkerDownloadModel: ObservableObject {
         do {
             let targetFolder = LibraryModel.drive.appendingPathComponent("Games/AnkerImports", isDirectory: true)
             try FileManager.default.createDirectory(at: targetFolder, withIntermediateDirectories: true)
-            let target = targetFolder.appendingPathComponent(UUID().uuidString + "-" + file.lastPathComponent)
-            try FileManager.default.copyItem(at: file, to: target)
+            // A Windows EXE often depends on DLLs and assets beside it.
+            // Import its containing directory, not the EXE alone.
+            let sourceFolder = file.deletingLastPathComponent()
+            guard let walker = FileManager.default.enumerator(
+                at: sourceFolder, includingPropertiesForKeys: [.isSymbolicLinkKey],
+                options: [], errorHandler: { _, _ in false }) else {
+                throw NSError(domain: "AnkerImport", code: 2, userInfo: [
+                    NSLocalizedDescriptionKey: "Cannot inspect the executable's game folder."
+                ])
+            }
+            while let item = walker.nextObject() as? URL {
+                let values = try item.resourceValues(forKeys: [.isSymbolicLinkKey])
+                guard values.isSymbolicLink != true else {
+                    throw NSError(domain: "AnkerImport", code: 3, userInfo: [
+                        NSLocalizedDescriptionKey: "Game folder contains a symbolic link; import cancelled."
+                    ])
+                }
+            }
+            let destination = targetFolder.appendingPathComponent(
+                UUID().uuidString + "-" + sourceFolder.lastPathComponent, isDirectory: true)
+            try FileManager.default.copyItem(at: sourceFolder, to: destination)
+            let target = destination.appendingPathComponent(file.lastPathComponent)
             do {
                 try addToLibrary(target)
-                status = "Added to your game library."
+                status = "Game folder and executable added to your library."
             } catch {
-                try? FileManager.default.removeItem(at: target)
+                try? FileManager.default.removeItem(at: destination)
                 throw error
             }
         } catch {
