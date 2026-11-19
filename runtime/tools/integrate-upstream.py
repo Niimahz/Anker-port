@@ -116,6 +116,29 @@ private final class AnkerDownloadModel: ObservableObject {
                 status = "Select an extracted game folder."
                 return
             }
+            // Reject links before copying: a linked asset could escape the selected
+            // game tree, while Wine expects a self-contained drive_c directory.
+            guard let preflight = FileManager.default.enumerator(
+                at: source, includingPropertiesForKeys: [.isSymbolicLinkKey],
+                options: [], errorHandler: { _, _ in false }) else {
+                status = "Cannot inspect the selected game folder."
+                return
+            }
+            var containsExecutable = false
+            while let item = preflight.nextObject() as? URL {
+                let values = try item.resourceValues(forKeys: [.isSymbolicLinkKey, .isRegularFileKey])
+                guard values.isSymbolicLink != true else {
+                    status = "Game folder contains a symbolic link; import cancelled."
+                    return
+                }
+                if values.isRegularFile == true && item.pathExtension.lowercased() == "exe" {
+                    containsExecutable = true
+                }
+            }
+            guard containsExecutable else {
+                status = "No Windows EXE found; nothing was copied."
+                return
+            }
             let destination = LibraryModel.drive
                 .appendingPathComponent("Games/AnkerImports", isDirectory: true)
                 .appendingPathComponent(UUID().uuidString + "-" + source.lastPathComponent, isDirectory: true)
