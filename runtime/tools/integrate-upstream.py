@@ -18,6 +18,10 @@ original += r'''
 // ANKER_PORT_INTEGRATION_V1
 @MainActor
 private final class AnkerDownloadModel: ObservableObject {
+    static let shared = AnkerDownloadModel()
+    @Published var extracting: Set<URL> = []
+    private var queue: [URL] = []
+    @Published var extractionErrors: [URL: String] = [:]
     @Published var address = ""
     @Published var status = "Ready to download"
     @Published var downloadedBytes: Int64 = 0
@@ -52,8 +56,71 @@ private final class AnkerDownloadModel: ObservableObject {
         files = (try? FileManager.default.contentsOfDirectory(
             at: directory, includingPropertiesForKeys: [.contentModificationDateKey],
             options: [.skipsHiddenFiles]))?
-            .filter { $0.isFileURL && !$0.hasDirectoryPath }
+            .filter { $0.isFileURL }
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending } ?? []
+    }
+
+    func isArchive(_ url: URL) -> Bool {
+        if url.hasDirectoryPath { return false }
+        if ["zip", "rar", "7z"].contains(url.pathExtension.lowercased()) { return true }
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? handle.close() }
+        let prefix = Array((try? handle.read(upToCount: 8)) ?? Data())
+        return prefix.starts(with: [0x50, 0x4b, 3, 4]) ||
+            prefix.starts(with: [0x52, 0x61, 0x72, 0x21]) ||
+            prefix.starts(with: [0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c])
+    }
+
+    func didSave(_ file: URL) {
+        refresh()
+        if isArchive(file) { extract(file) }
+    }
+
+    func extract(_ file: URL) {
+        guard files.contains(file), !extracting.contains(file) else { return }
+        extractionErrors[file] = nil
+        extracting.insert(file)
+        queue.append(file)
+        if extracting.count == 1 { Task { await drainQueue() } }
+    }
+
+    private func drainQueue() async {
+        while !queue.isEmpty {
+            let file = queue.removeFirst()
+            let destination = directory.appendingPathComponent(file.lastPathComponent + ".extracted", isDirectory: true)
+            do {
+                try await Task.detached(priority: .utility) {
+                    let fm = FileManager.default
+                    guard !fm.fileExists(atPath: destination.path) else {
+                        throw NSError(domain: "AnkerArchive", code: 1, userInfo: [NSLocalizedDescriptionKey: "The extracted folder already exists."])
+                    }
+                    let stage = file.deletingLastPathComponent().appendingPathComponent(".extract-" + UUID().uuidString)
+                    try fm.createDirectory(at: stage, withIntermediateDirectories: false)
+                    defer { try? fm.removeItem(at: stage) }
+                    var message = [CChar](repeating: 0, count: 512)
+                    guard anker_unpack(file.path, stage.path, &message, 512) == 0 else {
+                        throw NSError(domain: "AnkerArchive", code: 2, userInfo: [NSLocalizedDescriptionKey: String(cString: message)])
+                    }
+                    try fm.moveItem(at: stage, to: destination)
+                }.value
+                status = "Extraction complete"
+            } catch {
+                extractionErrors[file] = error.localizedDescription
+                status = "Extraction failed: " + error.localizedDescription
+            }
+            extracting.remove(file)
+            refresh()
+        }
+    }
+
+    func deleteDownload(_ file: URL) {
+        guard files.contains(file), !extracting.contains(file) else { return }
+        do {
+            try FileManager.default.removeItem(at: file)
+            if saved == file { saved = nil }
+            extractionErrors[file] = nil
+            refresh()
+        } catch { status = "Delete failed: " + error.localizedDescription }
     }
 
     private func addToLibrary(_ executable: URL) throws {
@@ -281,6 +348,7 @@ private final class AnkerDownloadModel: ObservableObject {
             downloadedBytes = (try? FileManager.default.attributesOfItem(atPath: destination.path)[.size] as? NSNumber)?.int64Value ?? 0
             saved = destination
             status = "Download complete"
+            didSave(destination)
         } catch {
             status = "Download failed (" + url.host.orEmpty + "): " + error.localizedDescription
         }
@@ -301,7 +369,8 @@ private struct AnkerSteamGame: Decodable, Identifiable {
 }
 
 struct AnkerNativeDownloads: View {
-    @StateObject private var model = AnkerDownloadModel()
+    @ObservedObject private var model = AnkerDownloadModel.shared
+    @State private var pendingDelete: URL?
     @State private var selectingGameFolder = false
     @ObservedObject private var jit = JITCoordinator.shared
     @ObservedObject private var library = LibraryModel.shared
@@ -315,7 +384,7 @@ struct AnkerNativeDownloads: View {
                 gameImport
                 steamAndFiles
 
-                Label("Downloads are saved to Documents/AnkerDownloads. EXE and extracted-folder import use your game library; archive extraction is not yet supported.",
+                Label("Downloads are saved to Documents/AnkerDownloads. ZIP, RAR and 7z downloads extract automatically. Import the extracted folder to add a game.",
                       systemImage: "info.circle")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -325,6 +394,10 @@ struct AnkerNativeDownloads: View {
         }
         .background(Color(uiColor: .systemGroupedBackground))
         .onAppear { model.refresh() }
+        .alert("Delete download?", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }), presenting: pendingDelete) { url in
+            Button("Delete", role: .destructive) { model.deleteDownload(url) }
+            Button("Cancel", role: .cancel) {}
+        } message: { url in Text(url.lastPathComponent) }
         .fileImporter(isPresented: $selectingGameFolder,
                       allowedContentTypes: [.folder],
                       allowsMultipleSelection: false) { result in
@@ -563,6 +636,20 @@ struct AnkerNativeDownloads: View {
                         .accessibilityLabel("Share " + file.lastPathComponent)
                     }
                     .padding(.vertical, 7)
+                    HStack {
+                        if file.hasDirectoryPath {
+                            Button("Import game") { model.importGameFolder(file) }
+                        } else if model.isArchive(file) {
+                            Button(model.extracting.contains(file) ? "Extracting…" : "Extract") { model.extract(file) }
+                                .disabled(model.extracting.contains(file))
+                        }
+                        Spacer()
+                        Button("Delete", role: .destructive) { pendingDelete = file }
+                            .disabled(model.extracting.contains(file))
+                    }
+                    if let error = model.extractionErrors[file] {
+                        Text(error).font(.caption).foregroundStyle(.red)
+                    }
                     Divider()
                 }
             }

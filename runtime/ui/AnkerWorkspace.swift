@@ -82,6 +82,7 @@ struct AnkerHome: View {
 
 @MainActor
 final class AnkerWebSession: NSObject, ObservableObject, WKNavigationDelegate, WKDownloadDelegate {
+    private var destinations: [ObjectIdentifier: (temporary: URL, final: URL)] = [:]
     let page = WKWebView()
     @Published var address = ""
     @Published var status = ""
@@ -139,11 +140,26 @@ final class AnkerWebSession: NSObject, ObservableObject, WKNavigationDelegate, W
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             let name = (suggestedFilename as NSString).lastPathComponent
             status = "Downloading " + name
-            completionHandler(dir.appendingPathComponent(UUID().uuidString + "-" + (name.isEmpty || name == "/" ? "download" : name)))
+            let final = dir.appendingPathComponent(UUID().uuidString + "-" + (name.isEmpty || name == "/" ? "download" : name))
+            let temporary = dir.appendingPathComponent(".download-" + UUID().uuidString)
+            destinations[ObjectIdentifier(download)] = (temporary, final)
+            completionHandler(temporary)
         } catch { status = error.localizedDescription; completionHandler(nil) }
     }
-    func downloadDidFinish(_ download: WKDownload) { status = "Saved to Downloads" }
-    func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) { status = error.localizedDescription }
+    func downloadDidFinish(_ download: WKDownload) {
+        guard let paths = destinations.removeValue(forKey: ObjectIdentifier(download)) else { return }
+        do {
+            try FileManager.default.moveItem(at: paths.temporary, to: paths.final)
+            AnkerDownloadModel.shared.didSave(paths.final)
+            status = "Saved to Downloads"
+        } catch { status = error.localizedDescription }
+    }
+    func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
+        if let paths = destinations.removeValue(forKey: ObjectIdentifier(download)) {
+            try? FileManager.default.removeItem(at: paths.temporary)
+        }
+        status = error.localizedDescription
+    }
 }
 
 private struct AnkerWebPage: UIViewRepresentable {
