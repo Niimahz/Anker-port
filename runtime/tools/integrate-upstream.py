@@ -14,42 +14,8 @@ assert marker in original or "// ANKER_PORT_INTEGRATION_V1" in original, "upstre
 if "// ANKER_PORT_INTEGRATION_V1" in original:
     print("Anker download overlay already integrated")
     raise SystemExit(0)
-original = original.replace(marker, """            ContentView()
-                .overlay(alignment: .topTrailing) {
-                    AnkerDownloadEntry()
-                        .padding(.top, 8)
-                        .padding(.trailing, 12)
-                }
-""", 1)
 original += r'''
 // ANKER_PORT_INTEGRATION_V1
-// Additive SwiftUI experience: upstream Madeira library and Wine launch stay untouched.
-private struct AnkerDownloadEntry: View {
-    @State private var showingHub = false
-
-    var body: some View {
-        Button { showingHub = true } label: {
-            Label("Anker", systemImage: "square.stack.3d.up.fill")
-                .font(.subheadline.weight(.bold))
-                .padding(.horizontal, 15)
-                .padding(.vertical, 10)
-                .foregroundStyle(.white)
-                .background(
-                    LinearGradient(colors: [Color(red: 0.20, green: 0.37, blue: 0.96),
-                                            Color(red: 0.42, green: 0.25, blue: 0.84)],
-                                   startPoint: .topLeading, endPoint: .bottomTrailing),
-                    in: Capsule()
-                )
-                .shadow(color: .indigo.opacity(0.25), radius: 9, y: 4)
-        }
-        .accessibilityIdentifier("anker.downloads.open")
-        .sheet(isPresented: $showingHub) {
-            NavigationStack { AnkerNativeDownloads() }
-                .tint(.indigo)
-        }
-    }
-}
-
 @MainActor
 private final class AnkerDownloadModel: ObservableObject {
     @Published var address = ""
@@ -96,7 +62,7 @@ private final class AnkerDownloadModel: ObservableObject {
         library.save(entry)
         guard library.entries.contains(where: { $0.id == entry.id }) else {
             throw NSError(domain: "AnkerImport", code: 1, userInfo: [
-                NSLocalizedDescriptionKey: library.error ?? "Madeira could not register the game."
+                NSLocalizedDescriptionKey: library.error ?? "Anker Port could not register the game."
             ])
         }
     }
@@ -123,7 +89,7 @@ private final class AnkerDownloadModel: ObservableObject {
             try FileManager.default.copyItem(at: file, to: target)
             do {
                 try addToLibrary(target)
-                status = "Added to Madeira library. Launch it from the Games tab."
+                status = "Added to your game library."
             } catch {
                 try? FileManager.default.removeItem(at: target)
                 throw error
@@ -184,7 +150,7 @@ private final class AnkerDownloadModel: ObservableObject {
                     try? FileManager.default.removeItem(at: destination)
                     throw error
                 }
-                status = "Game folder imported and executable registered in Madeira."
+                status = "Game folder imported and executable registered in your library."
             } else if candidates.isEmpty {
                 status = "Folder copied to Wine drive_c, but no EXE was found."
             } else {
@@ -249,7 +215,7 @@ private final class AnkerDownloadModel: ObservableObject {
 
     func saveConfig() {
         guard let executable = configExecutable, executable.path.hasPrefix(LibraryModel.drive.path + "/") else {
-            configStatus = "Only games inside the Madeira drive can be configured."
+            configStatus = "Only games on the game drive can be configured."
             return
         }
         do {
@@ -311,12 +277,11 @@ private struct AnkerSteamGame: Decodable, Identifiable {
     let name: String
 }
 
-private struct AnkerNativeDownloads: View {
+struct AnkerNativeDownloads: View {
     @StateObject private var model = AnkerDownloadModel()
     @State private var selectingGameFolder = false
     @ObservedObject private var jit = JITCoordinator.shared
     @ObservedObject private var library = LibraryModel.shared
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ScrollView {
@@ -327,7 +292,7 @@ private struct AnkerNativeDownloads: View {
                 gameImport
                 steamAndFiles
 
-                Label("Downloads are saved to Documents/AnkerDownloads. EXE and extracted-folder import use Madeira's native library; archive extraction is not yet supported.",
+                Label("Downloads are saved to Documents/AnkerDownloads. EXE and extracted-folder import use your game library; archive extraction is not yet supported.",
                       systemImage: "info.circle")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -336,13 +301,6 @@ private struct AnkerNativeDownloads: View {
             .padding(18)
         }
         .background(Color(uiColor: .systemGroupedBackground))
-        .navigationTitle("Anker Port")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Done") { dismiss() }
-            }
-        }
         .onAppear { model.refresh() }
         .fileImporter(isPresented: $selectingGameFolder,
                       allowedContentTypes: [.folder],
@@ -357,24 +315,15 @@ private struct AnkerNativeDownloads: View {
     }
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("ANKER PORT", systemImage: "square.stack.3d.up.fill")
-                .font(.caption.weight(.heavy))
-                .tracking(2)
-                .foregroundStyle(.indigo)
-            Text("Your Windows gaming hub.")
+            Label("Downloads", systemImage: "arrow.down.circle.fill")
+                .font(.largeTitle.bold())
             Text(String(library.entries.count) + " games in library")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .font(.system(size: 32, weight: .heavy, design: .rounded))
-                .minimumScaleFactor(0.75)
-            Text("Download, import and organize games. Powered by the Madeira runtime.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(.subheadline).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(24)
         .background(
-            LinearGradient(colors: [.indigo.opacity(0.13), .purple.opacity(0.06)],
+            LinearGradient(colors: [.teal.opacity(0.13), .purple.opacity(0.06)],
                            startPoint: .topLeading, endPoint: .bottomTrailing),
             in: RoundedRectangle(cornerRadius: 22)
         )
@@ -413,7 +362,7 @@ private struct AnkerNativeDownloads: View {
                     .font(.caption)
                     .foregroundStyle(.red)
             }
-            Text("Game launches and JIT activation remain managed by Madeira.")
+            Text("JIT status applies to your next game session.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -449,7 +398,7 @@ private struct AnkerNativeDownloads: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.white)
-            .background(.indigo, in: RoundedRectangle(cornerRadius: 13))
+            .background(.teal, in: RoundedRectangle(cornerRadius: 13))
             .disabled(model.busy || model.validatedURL == nil)
             .opacity(model.busy || model.validatedURL == nil ? 0.55 : 1)
             .accessibilityIdentifier("anker.downloads.start")
@@ -500,7 +449,7 @@ private struct AnkerNativeDownloads: View {
             }
             if model.configExecutable != nil {
                 Text("Game settings (local JSON)").font(.headline)
-                Text("Saved settings do not yet change the Madeira game launch.")
+                Text("Saved settings do not yet change the game launch.")
                     .font(.caption).foregroundStyle(.secondary)
                 TextEditor(text: $model.configText)
                     .accessibilityIdentifier("anker.config.editor")
@@ -511,7 +460,7 @@ private struct AnkerNativeDownloads: View {
                     .buttonStyle(.borderedProminent)
                 Text(model.configStatus).font(.caption)
             }
-            Text("Copies the complete folder into Madeira's Wine drive, preserving DLLs and assets.")
+            Text("Copies the complete folder into the Wine drive, preserving DLLs and assets.")
                 .accessibilityIdentifier("anker.import.description")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -572,7 +521,7 @@ private struct AnkerNativeDownloads: View {
                     HStack(spacing: 12) {
                         Image(systemName: "doc.zipper")
                             .font(.title3)
-                            .foregroundStyle(.indigo)
+                            .foregroundStyle(.teal)
                         Text(file.lastPathComponent)
                             .font(.subheadline)
                             .lineLimit(2)
@@ -583,7 +532,7 @@ private struct AnkerNativeDownloads: View {
                             } label: {
                                 Image(systemName: "plus.rectangle.on.folder")
                             }
-                            .accessibilityLabel("Add executable to Madeira library")
+                            .accessibilityLabel("Add executable to library")
                         }
                         ShareLink(item: file) {
                             Image(systemName: "square.and.arrow.up")
@@ -600,5 +549,14 @@ private struct AnkerNativeDownloads: View {
     }
 }
 '''
+assets = Path(__file__).resolve().parents[1] / "ui"
+original += "\n" + (assets / "AnkerWorkspace.swift").read_text()
+library = source.with_name("Library.swift")
+if library.exists():
+    from importlib.util import module_from_spec, spec_from_file_location
+    spec = spec_from_file_location("workspace_overlay", assets / "workspace_overlay.py")
+    overlay = module_from_spec(spec)
+    spec.loader.exec_module(overlay)
+    overlay.install(source.parent)
 source.write_text(original)
 print("Added Anker Downloads to the real Madeira application entry point.")
