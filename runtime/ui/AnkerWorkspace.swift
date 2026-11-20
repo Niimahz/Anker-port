@@ -160,19 +160,22 @@ struct PortDock: View {
         HStack(spacing: 1) {
             ForEach(items, id: \.0) { item in
                 Button { select(item.0) } label: {
-                    VStack(spacing: 4) {
+                    HStack(spacing: 6) {
                         Image(systemName: item.2).font(.system(size: 17, weight: .semibold))
-                        Text(item.1).font(.caption2.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.68)
+                        if tab == item.0 {
+                            Text(item.1).font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.72)
+                        }
                     }
-                    .frame(maxWidth: .infinity, minHeight: 48)
-                    .foregroundStyle(tab == item.0 ? Color.black : Color.white.opacity(0.8))
+                    .padding(.horizontal, tab == item.0 ? 9 : 0)
+                    .frame(minWidth: 44, maxWidth: tab == item.0 ? .infinity : 50, minHeight: 46)
+                    .foregroundStyle(tab == item.0 ? Color.black : Color.white.opacity(0.85))
                     .background {
                         if tab == item.0 {
                             RoundedRectangle(cornerRadius: 13).fill(PortStyle.signal)
                                 .matchedGeometryEffect(id: "tab", in: selection)
                         }
                     }
-                }.buttonStyle(PortPress()).accessibilityAddTraits(tab == item.0 ? .isSelected : [])
+                }.buttonStyle(PortPress()).accessibilityLabel(item.1).accessibilityAddTraits(tab == item.0 ? .isSelected : [])
             }
         }.animation(reduceMotion ? nil : .spring(duration: 0.34, bounce: 0.17), value: tab)
         .sensoryFeedback(.selection, trigger: tab)
@@ -360,5 +363,53 @@ struct AnkerBrowser: View {
                 Button { session.page.goForward() } label: { Label("Forward", systemImage: "chevron.right") }.disabled(!session.forward)
             }.font(.subheadline.weight(.semibold)).padding(12).background(PortStyle.panel)
         }.background(PortStyle.ground)
+    }
+}
+
+struct PortCollectionWall: View {
+    let games: [LibraryEntry]
+    let searching: Bool
+    let focused: UUID?
+    let open: (LibraryEntry) -> Void
+    let add: () -> Void
+
+    var body: some View {
+        if games.isEmpty {
+            VStack(alignment: .leading, spacing: 14) {
+                Image(systemName: searching ? "magnifyingglass" : "rectangle.stack.badge.plus")
+                    .font(.largeTitle).foregroundStyle(PortStyle.accent)
+                Text(searching ? "No matching games" : "Your collection starts here")
+                    .font(.title2.bold())
+                if !searching {
+                    Button(action: add) { Label("Add executable", systemImage: "plus") }
+                        .buttonStyle(.borderedProminent)
+                }
+            }.padding(22).frame(maxWidth: .infinity, alignment: .leading).portPanel()
+        } else {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 144, maximum: 245), spacing: 12)], alignment: .leading, spacing: 16) {
+                ForEach(games) { game in
+                    Button { open(game) } label: {
+                        Color(white: 0.10).aspectRatio(0.74, contentMode: .fit)
+                            .overlay {
+                                GeometryReader { box in
+                                    LibraryArtwork(entry: game)
+                                        .frame(width: box.size.width, height: box.size.height)
+                                        .clipped().accessibilityHidden(true)
+                                }
+                            }
+                            .overlay(alignment: .bottomLeading) {
+                                LinearGradient(colors: [.clear, .black.opacity(0.94)], startPoint: .top, endPoint: .bottom)
+                                    .frame(maxHeight: 104)
+                                    .overlay(alignment: .bottomLeading) {
+                                        Text(game.title).font(.headline.weight(.heavy)).lineLimit(3)
+                                            .foregroundStyle(.white).padding(12)
+                                    }
+                            }
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(focused == game.id ? PortStyle.signal : Color.primary.opacity(0.12), lineWidth: focused == game.id ? 3 : 1) }
+                    }.buttonStyle(PortPress()).accessibilityLabel(game.title).id(game.id)
+                }
+            }
+        }
     }
 }

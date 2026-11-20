@@ -31,6 +31,7 @@ def install(root: Path):
     change('else { settingsToolbar }', 'else if tab == 1 { settingsToolbar }')
     change('switchTab(to: 1 - tab)', 'switchTab(to: [4: 0, 0: 2, 2: 3, 3: 1, 1: 4][tab] ?? 4)')
     change('settingsShow("credits", "thanks",', 'settingsShow("credits", "Nima HZ", "Niimahz", "thanks",')
+    change('if SettingsPages.enabled, settingsSearch.trimmingCharacters', 'if settingsSearch.trimmingCharacters')
     pages = root / "SettingsPages.swift"
     settings = pages.read_text()
     first = '            MadeiraCredit(name: "Will Faust"'
@@ -47,52 +48,119 @@ def install(root: Path):
                     Text("Anker Port").font(.system(.headline, design: .rounded, weight: .heavy))
                 }.accessibilityElement(children: .combine)
             }""")
-    change("                desktopButton\n                // The library's sections", """                PortPageHeading(title: "Library", symbol: "square.grid.2x2.fill")
-                desktopButton
-                // The library's sections""")
-    change("desktop: { AnyView(desktopButton) }", 'desktop: { AnyView(VStack(alignment: .leading, spacing: 14) { PortPageHeading(title: "Library", symbol: "square.grid.2x2.fill"); desktopButton }) }')
-    change("                    }.padding(4)\n                }\n            }.foregroundStyle(.primary)", """                    }.padding(9).frame(maxWidth: .infinity, alignment: .leading).portPanel()
+    change('@State private var search = ""', '@State private var search = ""\n    @State private var showsSources = false')
+    change('Group { if LibraryGridArm.zoomable(setting: zoomableGrid, layout: layout)', 'Group { if showsSources && LibraryGridArm.zoomable(setting: zoomableGrid, layout: layout)')
+    change('        guard group != "platform" else', '        if !showsSources { return collectionGames }\n        guard group != "platform" else')
+    change('    private var library: some View {', r'''    private var collectionGames: [LibraryEntry] {
+        let games = model.entries.filter { $0.desktop != true && $0.listedInLibrary && (search.isEmpty || $0.title.localizedCaseInsensitiveContains(search)) }
+        if sort == "added" { return Array(games.reversed()) }
+        return games.sorted {
+            if sort == "played", $0.lastPlayed != $1.lastPlayed { return ($0.lastPlayed ?? .distantPast) > ($1.lastPlayed ?? .distantPast) }
+            if sort == "size", $0.folderBytes != $1.folderBytes { return ($0.folderBytes ?? -1) > ($1.folderBytes ?? -1) }
+            return $0.title.localizedStandardCompare($1.title) == .orderedAscending
+        }
+    }
+    private var collectionHeader: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Library").font(.system(.largeTitle, design: .serif, weight: .bold))
+                Spacer()
+                if !showsSources {
+                    Text(String(collectionGames.count)).font(.title.monospacedDigit()).foregroundStyle(.secondary)
+                        .accessibilityLabel("Games: " + String(collectionGames.count))
                 }
-            }.foregroundStyle(.primary)""")
+            }
+            HStack(spacing: 8) {
+                ForEach([false, true], id: \.self) { sources in
+                    Button { showsSources = sources } label: {
+                        Text(sources ? "Sources" : "Collection").font(.headline)
+                            .padding(.horizontal, 14).frame(minHeight: 44)
+                            .foregroundStyle(showsSources == sources ? Color.black : Color.primary)
+                            .background(showsSources == sources ? PortStyle.signal : PortStyle.panel, in: Capsule())
+                    }.buttonStyle(PortPress()).accessibilityAddTraits(showsSources == sources ? .isSelected : [])
+                }
+            }
+        }
+    }
+    private var library: some View {''')
+    change('                if !storeTabs.isEmpty { LibraryStoreTabBar(tabs: storeTabs, selection: $storeTab) }\n                desktopButton', '''                collectionHeader
+                if !showsSources {
+                    PortCollectionWall(games: collectionGames, searching: !search.isEmpty, focused: controller.connected ? focused : nil,
+                                       open: { selected = $0 }, add: { browser = true })
+                    desktopButton
+                } else {
+                if !storeTabs.isEmpty { LibraryStoreTabBar(tabs: storeTabs, selection: $storeTab) }
+                desktopButton''')
+    change('            }\n            // Ambient light behind the grid cards', '                }\n            }\n            // Ambient light behind the grid cards')
+    change("desktop: { AnyView(desktopButton) }", 'desktop: { AnyView(VStack(alignment: .leading, spacing: 14) { collectionHeader; desktopButton }) }')
+    change('            } label: { Label("Library options"', '''                if !showsSources { Button("Browse sources and layouts") { showsSources = true } }
+            } label: { Label("Library options"''')
+    change('                if zoomableGrid {\n                    // The new grid', '                if showsSources {\n                if zoomableGrid {\n                    // The new grid')
+    change('                Picker("Sort by", selection: $sort)', '                }\n                Picker("Sort by", selection: $sort)')
     source = source.replace(".background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())", ".background(PortStyle.ground.ignoresSafeArea())")
     change('            .navigationTitle("Game details")', '''            .scrollContentBackground(.hidden).background(PortStyle.ground)
             .tint(PortStyle.accent)
             .navigationTitle("Game details")''')
     change('            .background(pending || configuration.isPressed ? Color(uiColor: .darkGray) : .accentColor,', '''            .background(pending || configuration.isPressed ? Color(uiColor: .darkGray) : Color(red: 0.66, green: 0.22, blue: 0.055),''')
-    start = settings.index('        Form {', settings.index('struct SettingsPagesList: View'))
+    start = settings.index('    var body: some View {', settings.index('struct SettingsPagesList: View'))
     end = settings.index('    private func summary', start)
-    settings = settings[:start] + r'''        ScrollView {
+    settings = settings[:start] + r'''    @State private var category = 0
+    private let groups = SettingsPages.groups
+    private let names = ["Stores", "Gameplay", "Device", "App"]
+    private let symbols = ["bag", "gamecontroller", "cpu", "switch.2"]
+    var body: some View {
+        ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                PortPageHeading(title: "Settings", symbol: "slider.horizontal.3")
-                LibraryStatus().padding(16).frame(maxWidth: .infinity, alignment: .leading).portPanel()
-                ForEach(Array(SettingsPages.groups.enumerated()), id: \.offset) { _, group in
-                    let pages = group.1.filter(\.shown)
-                    if !pages.isEmpty {
-                        if let title = group.0 { Text(title).font(.headline).accessibilityAddTraits(.isHeader) }
-                        VStack(spacing: 0) {
-                            ForEach(pages, id: \.self) { page in
-                                NavigationLink { SettingsPageView(page: page, startDock: startDock) } label: {
-                                    HStack(spacing: 12) {
-                                        Image(systemName: page.symbol).frame(width: 32, height: 32)
-                                            .foregroundStyle(PortStyle.accent)
-                                            .background(PortStyle.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 9))
-                                        Text(page.title).font(.body.weight(.medium))
-                                        Spacer()
-                                        if let value = summary(page) { Text(value).font(.caption).foregroundStyle(.secondary) }
-                                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
-                                    }.padding(.horizontal, 14).padding(.vertical, 9).contentShape(Rectangle())
-                                }.buttonStyle(PortPress())
-                                if page != pages.last { Divider().padding(.leading, 58) }
+                Text("Control room").font(.system(.largeTitle, design: .serif, weight: .bold))
+                    .accessibilityAddTraits(.isHeader)
+                LibraryStatus().frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(16).portPanel()
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        ForEach(groups.indices, id: \.self) { i in
+                            if groups[i].1.contains(where: { $0.shown }) {
+                                Button { category = i } label: {
+                                    Label(names[i], systemImage: symbols[i]).font(.subheadline.bold())
+                                        .fixedSize().padding(.horizontal, 13).frame(minHeight: 44)
+                                        .foregroundStyle(category == i ? Color.black : Color.primary)
+                                        .background(category == i ? PortStyle.signal : PortStyle.panel, in: Capsule())
+                                }.buttonStyle(PortPress()).accessibilityAddTraits(category == i ? .isSelected : [])
                             }
-                        }.portPanel()
+                        }
+                    }
+                }.scrollIndicators(.hidden)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 142, maximum: 290), spacing: 10)], spacing: 10) {
+                    ForEach(groups[category].1.filter(\.shown), id: \.self) { page in
+                        NavigationLink { SettingsPageView(page: page, startDock: startDock) } label: {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack { Image(systemName: page.symbol).font(.title2).foregroundStyle(PortStyle.accent)
+                                    Spacer(); Image(systemName: "arrow.up.right").font(.caption).foregroundStyle(.secondary) }
+                                Spacer(minLength: 8)
+                                Text(page.title).font(.headline)
+                                if let value = summary(page) { Text(value).font(.caption).foregroundStyle(.secondary) }
+                            }.padding(15).frame(maxWidth: .infinity, minHeight: 116, alignment: .topLeading).portPanel()
+                        }.buttonStyle(PortPress())
                     }
                 }
-            }.padding(18).frame(maxWidth: 700).frame(maxWidth: .infinity)
+            }.padding(18).frame(maxWidth: 740).frame(maxWidth: .infinity)
         }.background(PortStyle.ground)
+        .onAppear {
+            if !groups[category].1.contains(where: { $0.shown }) {
+                category = groups.firstIndex(where: { $0.1.contains(where: { $0.shown }) }) ?? 0
+            }
+        }
     }
 
 ''' + settings[end:]
-    settings = settings.replace('Form { content }', 'Form { content }.scrollContentBackground(.hidden).background(PortStyle.ground).tint(PortStyle.accent)')
+    # Keep native controls and their modal presenters in every individual settings page.
+    settings = settings.replace('Form { content }', '''Form {
+                Section {
+                    Label(page.title, systemImage: page.symbol)
+                        .font(.system(.title2, design: .serif, weight: .bold))
+                        .padding(.vertical, 8)
+                }.listRowBackground(PortStyle.panel)
+                content
+            }.scrollContentBackground(.hidden).background(PortStyle.ground).tint(PortStyle.accent)''').replace('.navigationTitle(page.title)', '.navigationTitle("Settings")')
     onboarding = root / "Onboarding.swift"
     welcome = onboarding.read_text().replace('            .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())', '            .background(PortStyle.ground.ignoresSafeArea()).tint(PortStyle.accent)')
     welcome = welcome.replace('                        Text("Step ', '                        PortMark().frame(width: 56, height: 48)\n                        Text("Step ')
