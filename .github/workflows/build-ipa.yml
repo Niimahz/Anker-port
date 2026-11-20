@@ -8,6 +8,7 @@ on:
       - 'runtime/ui/**'
       - 'runtime/tools/prepare-archives.sh'
       - 'runtime/tools/embed-export-template.py'
+      - 'runtime/tools/boxedwine_assets.py'
       - 'runtime/tools/prepare-swift-catalog.py'
       - 'runtime/tools/brand-upstream.py'
       - 'runtime/tools/verify-ipa.py'
@@ -345,7 +346,10 @@ jobs:
       - name: Verify and package user-signable IPA
         run: |
           mkdir -p dist
-          python3 runtime/tools/embed-export-template.py native-src/dist/Madeira.ipa dist/AnkerPort-unsigned.ipa
+          git init -q boxedwine-dist
+          git -C boxedwine-dist fetch --depth 1 https://github.com/nathalislight/BoxedWine.git 5f8247b1e2eec92e09a0f5199b87356dd43c0c93
+          git -C boxedwine-dist checkout --detach FETCH_HEAD
+          python3 runtime/tools/embed-export-template.py native-src/dist/Madeira.ipa dist/AnkerPort-unsigned.ipa --boxedwine boxedwine-dist
           python3 runtime/tools/verify-ipa.py dist/AnkerPort-unsigned.ipa --revision "$(git -C native-src rev-parse HEAD)"
           shasum -a 256 dist/AnkerPort-unsigned.ipa > dist/SHA256SUMS
       - uses: actions/upload-artifact@v6

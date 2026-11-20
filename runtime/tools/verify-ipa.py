@@ -8,6 +8,7 @@ import struct
 import tarfile
 from pathlib import Path
 import zipfile
+from boxedwine_assets import ASSETS
 
 parser = argparse.ArgumentParser()
 parser.add_argument("ipa", type=Path)
@@ -45,7 +46,19 @@ with zipfile.ZipFile(args.ipa) as archive:
             command_bytes -= size
         assert command_bytes == 0 and ios, "Missing iPhoneOS build version"
 
-    for item in ("arm64ec-windows/xtajit64.dll", "x86_64-vcruntime/vcruntime140.dll"):
+    # The standalone template copies this runtime. Both guest architectures
+    # need their loader, even when the selected EXE launches a helper of the other bitness.
+    guest_modules = {
+        "arm64ec-windows/xtajit64.dll": None,
+        "x86_64-vcruntime/vcruntime140.dll": 0x8664,
+        "i386-windows/ntdll.dll": 0x014C,
+        "i386-windows/kernel32.dll": 0x014C,
+        "aarch64-windows/ntdll.dll": 0xAA64,
+        "aarch64-windows/wow64.dll": 0xAA64,
+        "aarch64-windows/wow64win.dll": 0xAA64,
+        "aarch64-windows/xtajit.dll": 0xAA64,
+    }
+    for item, machine in guest_modules.items():
         with archive.open(prefix + item) as dll:
             dos = dll.read(64)
             assert len(dos) == 64 and dos[:2] == b"MZ", f"Invalid DOS header: {item}"
@@ -54,10 +67,20 @@ with zipfile.ZipFile(args.ipa) as archive:
             dll.seek(offset)
             pe = dll.read(24)
             assert pe[:4] == b"PE\0\0" and struct.unpack_from("<H", pe, 22)[0] & 0x2000, f"Invalid PE DLL: {item}"
-            if item.startswith("x86_64"):
-                assert struct.unpack_from("<H", pe, 4)[0] == 0x8664, f"Expected x64 DLL: {item}"
+            if machine is not None:
+                assert struct.unpack_from("<H", pe, 4)[0] == machine, f"Wrong machine type: {item}"
     with archive.open(prefix + "prefix-template.tar.gz") as resource, tarfile.open(fileobj=resource, mode="r|gz") as template:
         assert any(member.isfile() and member.size for member in template), "Empty Wine prefix"
+    # Standalone IPAs are built from this nested seed, not from the outer app.
+    with archive.open(prefix + "PortSeed.bin") as raw, zipfile.ZipFile(raw) as seed:
+        for member in archive.infolist():
+            if member.filename.startswith(prefix) and member.filename not in {
+                    prefix + "PortSeed.bin", prefix + "PortSeed.plist"}:
+                embedded = seed.getinfo(member.filename)
+                assert (embedded.file_size, embedded.CRC) == (member.file_size, member.CRC), member.filename
+        for asset in (*ASSETS, "index.html", "module.js"):
+            assert seed.getinfo(prefix + "PortBoxedWine/" + asset).file_size > 0, asset
+        assert prefix + "PortSeed.bin" not in seed.namelist(), "Recursive export template"
 with args.ipa.open("rb") as ipa_file:
     digest = hashlib.sha256()
     for chunk in iter(lambda: ipa_file.read(1024 * 1024), b""):

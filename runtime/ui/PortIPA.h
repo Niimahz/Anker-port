@@ -20,13 +20,13 @@ static inline int port_build_ipa(const char *seed, const char *prefix, const cha
     const char *reason = NULL;
     char buffer[65536], name[PATH_MAX];
     if (!r || !w) { reason = "Out of memory"; goto done; }
-    archive_read_support_format_zip(r);
-    if (archive_read_open_filename(r, seed, sizeof(buffer)) != ARCHIVE_OK) goto done;
+    archive_read_support_format_zip_seekable(r);
+    if (seed && archive_read_open_filename(r, seed, sizeof(buffer)) != ARCHIVE_OK) goto done;
     if (archive_write_set_format_zip(w) != ARCHIVE_OK ||
-        archive_write_set_format_option(w, "zip", "compression", "store") != ARCHIVE_OK ||
+        archive_write_set_format_option(w, "zip", "compression", seed ? "store" : "deflate") != ARCHIVE_OK ||
         archive_write_open_filename(w, output) != ARCHIVE_OK) goto done;
     struct archive_entry *entry;
-    while ((rc = archive_read_next_header(r, &entry)) == ARCHIVE_OK) {
+    while (seed && (rc = archive_read_next_header(r, &entry)) == ARCHIVE_OK) {
         const char *path = archive_entry_pathname(entry);
         if (!path || strncmp(path, prefix, strlen(prefix))) continue;
         const char *rel = path + strlen(prefix);
@@ -38,11 +38,11 @@ static inline int port_build_ipa(const char *seed, const char *prefix, const cha
             if (archive_write_data(w, buffer, n) != n) goto done;
         if (n < 0 || archive_write_finish_entry(w) != ARCHIVE_OK) goto done;
     }
-    if (rc != ARCHIVE_EOF) goto done;
+    if (seed && rc != ARCHIVE_EOF) goto done;
     char *roots[] = {(char *)game, NULL};
     tree = fts_open(roots, FTS_PHYSICAL | FTS_NOCHDIR, NULL);
     if (!tree) { reason = strerror(errno); goto done; }
-    int index = 0;
+    int index = seed ? 0 : 2;
     for (;;) {
         const char *source;
         int directory = 0;
@@ -58,7 +58,10 @@ static inline int port_build_ipa(const char *seed, const char *prefix, const cha
             if (node->fts_info != FTS_D && node->fts_info != FTS_F) { reason = "Unreadable file or unsupported link in game folder"; goto done; }
             directory = node->fts_info == FTS_D;
             source = node->fts_path;
-            if (snprintf(name,sizeof(name),"%sPortGameFiles%s",prefix,source + strlen(game)) >= (int)sizeof(name)) {
+            if (!seed && node->fts_level == 0) continue;
+            const char *relative = source + strlen(game);
+            if (!seed && *relative == '/') relative++;
+            if (snprintf(name,sizeof(name),"%s%s%s",prefix,seed ? "PortGameFiles" : "",relative) >= (int)sizeof(name)) {
                 reason = "Game path too long"; goto done;
             }
         }
