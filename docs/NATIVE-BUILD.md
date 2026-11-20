@@ -1,23 +1,12 @@
-# Native runtime build and staging
+# Native iOS build
 
-The SwiftUI-only Anker Port IPA cannot execute Windows programs. A separate
-native runtime build is necessary.
+Open the [IPA workflow](../.github/workflows/build-ipa.yml) for the exact commands, SDK checks and pinned source revision. In [GitHub Actions](https://github.com/Niimahz/Anker-port/actions/workflows/build-ipa.yml), choose **Run workflow** on the intended branch if you have repository write access.
 
-## Source-based pipeline
+1. The macOS runner selects an Xcode SDK with the required MetalFX API and checks out Madeira at the revision specified in the workflow.
+2. It builds archive dependencies for iPhone and applies the Anker branding and SwiftUI integration to the upstream target.
+3. The workflow checks the integrated Swift sources, prepares native dependencies and invokes the upstream toolchain.
+4. It packages the unsigned app as AnkerPort-unsigned.ipa and runs the repository’s IPA verifier before uploading **AnkerPort-Unsigned-IPA**.
 
-1. The `build-native-runtime.yml` GitHub workflow checks out the complete
-   upstream source tree and invokes its real Wine/FEX/DXMT build.
-2. `runtime/tools/prepare-native.sh` stages native static libraries, Windows
-   PE DLLs, JIT translator DLLs, prefix template and entitlement source.
-3. `runtime/tools/verify-native.sh` checks required files are present.
-4. A **future integrated target** must compile the native Wine host and
-   Anker C adapter, link all native dependencies, package staged resources,
-   set supported entitlements, and connect the native display/JIT/session APIs.
+Download the artifact from the completed run and unzip it once. A successful packaging check establishes that the expected payload is present. Device signing, JIT and individual game compatibility still depend on the install and game.
 
-The staged artifacts are not sufficient to link a working app by themselves.
-In particular the upstream runtime uses a native display driver and process
-bridge with a complex build graph. Do not ship the reference IPA as if it were
-Anker Port, and do not enable Launch until the integrated binary exists.
-
-The source project's runtime requires compliance with GPL and third-party
-license notices.
+[Architecture](ARCHITECTURE.md) · [IPA verification script](../runtime/tools/verify-ipa.py)

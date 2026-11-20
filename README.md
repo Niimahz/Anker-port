@@ -1,32 +1,41 @@
-# Anker Port — iOS Windows Game Studio
+# Anker Port
 
-An independent iOS game library and compatibility project. The goal is to launch user-supplied Windows games on-device, then optionally build standalone game IPAs **after real on-device testing**.
+![Anker Port — a Windows game library for your iPhone](docs/media/anker-port-cover.jpg)
 
-## Current implemented source
-- SwiftUI Library, Downloads and Analyzer tabs
-- Anker's concurrent/segmented downloader and background download manager
-- Archive import from Files; ZIP extraction via ZIPFoundation and other supported archive formats via LibArchive
-- Local game folders and per-game inspection
-- PE EXE/DLL analysis (architecture and imported DLLs), BAT/CMD discovery
-- Compatibility profile JSON export
+Download a Windows game archive, extract it on your iPhone, and add its executable to a cover-art library. Anker Port brings Anker’s download and import workflow into a native iOS launcher built on Madeira. You supply the game files. Launch compatibility depends on the game, device and JIT setup.
 
-## Not implemented or verified
-- Wine/FEX/DXMT Windows game execution: **not yet integrated**
-- Game-specific standalone IPA packaging: **not yet integrated**
-- iPhone runtime validation: **not tested**
-- Successful iOS compilation: pending GitHub Actions result
+**[Download the unsigned IPA](https://github.com/Niimahz/Anker-port/actions/runs/44680760800/artifacts/14611992704)** · [Browse builds](https://github.com/Niimahz/Anker-port/actions/workflows/build-ipa.yml) · [Report a game result](https://github.com/Niimahz/Anker-port/issues/new?template=game-report.yml)
 
-The launcher is deliberately disabled rather than pretending to run a Windows executable.
+## Get started
 
-## Build
-The GitHub Actions workflow `.github/workflows/build-ipa.yml` generates an unsigned iOS IPA when the macOS runner completes successfully. Local build: `cd App && xcodegen generate` then build in Xcode with signing configured.
+1. Sign in to GitHub and download the build artifact above. Open the ZIP in Files to find **AnkerPort-unsigned.ipa**. GitHub lists this artifact through **December 4, 2026**. The builds page lists newer successful runs.
+2. Import the IPA into your configured LiveContainer setup, or sign it with your iOS sideloading tool. For game execution, check **JIT** in Settings.
+3. Open **Downloads** and paste a direct HTTPS file link, or use **Browser** to download from a website. You can also start with a game folder you already have in Files.
+4. In **Downloads → Files**, find your archive and tap **Extract** if needed. Import the extracted game folder, keeping the EXE, DLLs and assets together. If the app finds multiple executables, choose the game’s main EXE.
+5. Open **Library → Collection**, tap the game’s cover, then **Play**.
 
-## License and attribution
-Some source modules were adapted from the user's Anker Game Downloader project. Third-party dependencies retain their own licenses. Future integration of GPL-3.0-or-later runtime code must comply with corresponding source distribution and notice requirements. Runtime implementation names may be hidden from normal gameplay UI, but legal attribution cannot be removed.
+## Inside the app
 
-## Engineering milestones
-1. Verify compilation, resolve errors, test downloader/extraction.
-2. Bring in selected Anker browser and advanced archive features.
-3. Build in-process Windows runtime with Wine, x86 translation, and graphics translation; verify signing/JIT behavior.
-4. Launch real games and record device diagnostics.
-5. Add reproducible per-game IPA packaging after stable execution.
+| Destination | What you can do |
+| --- | --- |
+| Home | Return to a recently played game or jump to your library. |
+| Library | Browse your collection by cover art, open game details, or switch to Sources. |
+| Downloads | Save a direct download, extract an archive, import a folder or look up a title on Steam. |
+| Browser | Download files through a website’s own links and navigate back to the source. |
+| Settings | Check JIT and Memory+, then open controls grouped under Stores, Gameplay, Device and App. |
+
+### Archive support
+
+ZIP (including ZIP64), RAR/RAR5, 7z, TAR, TAR.GZ/TGZ and single-file Gzip. ZIP methods include Store, Deflate, LZMA, Zstandard (93), XZ (95) and PPMd. Password-protected archives and entries containing links have extraction limitations. A game that extracts successfully may still need runtime-specific settings to launch.
+
+## Build and contribute
+
+The macOS workflow builds the native iOS target and packages the unsigned IPA. The runtime source revision, integration scripts and packaging checks are tracked in this repository. A standalone IPA exporter for individual games remains a project goal.
+
+[Native build guide](docs/NATIVE-BUILD.md) · [Architecture](docs/ARCHITECTURE.md) · [Issues](https://github.com/Niimahz/Anker-port/issues) · [Press kit and shareable artwork](docs/PRESS-KIT.md)
+
+## Credits
+
+**Nima HZ (@Niimahz)** created Anker Port. The native runtime comes from Will Faust’s Madeira project and its contributors, including upstream work on Wine, FEX and DXMT. Archive extraction uses libarchive, XZ and Zstandard. Component licenses and upstream notices apply to their respective code. The app includes contributor credits under **Settings → App → Credits**.
+
+[Anker Game Downloader](https://github.com/Niimahz/Anker_build) · [Madeira source used by this build](https://github.com/willfaust/Madeira/tree/fbad430410b4075192166172447c859714726de9)

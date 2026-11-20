@@ -1,0 +1,35 @@
+name: Game compatibility report
+description: Share what happened when launching a Windows game on iOS.
+title: "[Game] "
+body:
+  - type: input
+    id: game
+    attributes:
+      label: Game and edition
+      placeholder: Title, version or store edition
+    validations:
+      required: true
+  - type: input
+    id: setup
+    attributes:
+      label: Device, iOS version, Anker Port build and JIT status
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: Furthest point reached
+      options:
+        - Import or extraction
+        - Launch screen
+        - Main menu
+        - Gameplay
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Steps, settings and observed result
+      description: Include the selected EXE, any settings you changed, and error text if available.
+    validations:
+      required: true

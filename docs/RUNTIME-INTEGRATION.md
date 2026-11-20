@@ -1,4 +1,6 @@
-# In-process Windows runtime integration plan
+# Early runtime integration notes
+
+This document records the prototype investigation before the native integration shipped. For the current build and runtime, see [Architecture](ARCHITECTURE.md) and [Native build](NATIVE-BUILD.md).
 
 ## Source-grounded reference
 The upstream Wine host exposes ABI version 12 via `app/Sources/WineHost/include/wine_host.h` in playportdev/playport. Its contract is:
@@ -13,10 +15,10 @@ The host is **not** a standalone library downloadable via Swift Package Manager.
 
 The source reference's `app/Package.swift` also links crypto, graphics and media libraries and stages generated binary artifacts before compilation. Madeira's `BUILDING.md` says its first complete native build can take several hours, including LLVM and FEX.
 
-## Implemented now
+## Prototype implementation
 `RuntimeLauncher.swift` defines an internal runtime boundary, validates that a user-supplied EXE is inside the imported game library and parses the PE architecture. It deliberately returns `unavailable` until native libraries and JIT integration exist.
 
-## Required engineering work
+## Original engineering plan
 - Pin audited upstream source revisions; preserve full GPL license, modifications, and third-party notices.
 - Reproduce the native build stages and generate compatible iOS static archives and guest DLL payloads.
 - Implement a native C/Objective-C host target around the **actual** ABI and bundled session root.
