@@ -46,6 +46,8 @@ with zipfile.ZipFile(args.ipa) as archive:
             command_bytes -= size
         assert command_bytes == 0 and ios, "Missing iPhoneOS build version"
 
+    assert info.get("CFBundleIdentifier") == "app.ankerport.ios", "Unexpected host bundle identifier"
+
     # The standalone template copies this runtime. Both guest architectures
     # need their loader, even when the selected EXE launches a helper of the other bitness.
     guest_modules = {

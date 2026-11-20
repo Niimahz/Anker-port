@@ -6,6 +6,7 @@ This overlay is a fork-derived product build, not the independent SwiftUI shell.
 """
 import pathlib
 import plistlib
+import re
 import sys
 
 if len(sys.argv) != 2:
@@ -23,6 +24,11 @@ data["NSLocalNetworkUsageDescription"] = (
 )
 with info.open("wb") as f:
     plistlib.dump(data, f, sort_keys=False)
-# Keep upstream's executable name, internal bundle identifiers and JIT protocol
-# unchanged: renaming those without auditing native runtime references can break it.
-print("Branded the app display name as Anker Port; retained GPL upstream runtime.")
+# The host and both helper targets derive their identifiers from this setting.
+settings, count = re.subn(
+    r"(?m)^(\s*MADEIRA_BUNDLE_IDENTIFIER = )(?:com\.willfaust\.madeora|app\.ankerport\.ios);$",
+    r"\g<1>app.ankerport.ios;", project.read_text()
+)
+assert count == 2, "Expected both Debug and Release bundle identifier settings"
+project.write_text(settings)
+print("Branded Anker Port with bundle identifier app.ankerport.ios")

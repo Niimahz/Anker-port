@@ -9,7 +9,7 @@ SCRIPT = pathlib.Path(__file__).resolve().parents[1] / "runtime/tools/brand-upst
 
 
 class BrandUpstreamTests(unittest.TestCase):
-    def test_branding_preserves_runtime_identifiers(self):
+    def test_branding_updates_app_identity_and_preserves_url_scheme(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
             app = root / "app/Madeira"
@@ -25,10 +25,12 @@ class BrandUpstreamTests(unittest.TestCase):
             }
             with info.open("wb") as stream:
                 plistlib.dump(before, stream)
-            (project / "project.pbxproj").write_text("// test fixture")
+            project_file = project / "project.pbxproj"
+            project_file.write_text("MADEIRA_BUNDLE_IDENTIFIER = com.willfaust.madeora;\n" * 2)
             subprocess.run([sys.executable, str(SCRIPT), str(root)], check=True)
             with info.open("rb") as stream:
                 after = plistlib.load(stream)
+            self.assertEqual(project_file.read_text().count("MADEIRA_BUNDLE_IDENTIFIER = app.ankerport.ios;"), 2)
             self.assertEqual(after["CFBundleDisplayName"], "Anker Port")
             self.assertEqual(after["CFBundleURLTypes"], before["CFBundleURLTypes"])
             self.assertEqual(after["CFBundleIdentifier"], before["CFBundleIdentifier"])
