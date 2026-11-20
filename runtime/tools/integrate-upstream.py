@@ -487,6 +487,17 @@ struct AnkerNativeDownloads: View {
 
     // A user-initiated, copyable diagnostic snapshot. Never include URLs, file paths,
     // download cookies or executable arguments in the shared report.
+    // Export only an error category: upstream error text can contain local paths.
+    private var ankerJITErrorCategory: String {
+        guard let error = jit.error, !error.isEmpty else { return "None reported" }
+        let normalized = error.lowercased()
+        if normalized.contains("timeout") || normalized.contains("timed out") { return "Timeout" }
+        if normalized.contains("permission") || normalized.contains("denied") { return "Permission denied" }
+        if normalized.contains("connect") || normalized.contains("network") { return "Connection problem" }
+        if normalized.contains("unsupported") || normalized.contains("unavailable") { return "Unavailable method" }
+        return "Unclassified error (details remain on device)"
+    }
+
     private var ankerRuntimeDiagnostic: String {
         let jitState = jit.busy ? "Connecting" : (jit.status ?? "Not checked")
         return [
@@ -495,7 +506,8 @@ struct AnkerNativeDownloads: View {
             "Library entries: \(library.entries.count)",
             "JIT method: \(jit.resolvedMethod.title)",
             "JIT state: \(jitState)",
-            "JIT error: \(jit.error ?? "None reported")",
+            "JIT error category: \(ankerJITErrorCategory)",
+            "JIT execution verified: No (status snapshot only)",
             "Library error: \(library.error ?? "None reported")",
             "Note: This is a status snapshot, not proof that an EXE launched."
         ].joined(separator: "\n")
