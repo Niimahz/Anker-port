@@ -30,7 +30,7 @@ ZIP (including ZIP64), RAR/RAR5, 7z, TAR, TAR.GZ/TGZ and single-file Gzip. ZIP m
 
 ## Build and contribute
 
-The macOS workflow builds the native iOS target and packages the unsigned IPA. The runtime source revision, integration scripts and packaging checks are tracked in this repository. A standalone IPA exporter for individual games remains a project goal.
+The macOS workflow builds the native iOS target and packages the unsigned IPA. The runtime source revision, integration scripts and packaging checks are tracked in this repository. Builds that include the export template add **Export game IPA** to game details. Choose a locally installed EXE, confirm its game folder, then save the unsigned IPA to Files. Each exported app contains the runtime, game folder and launch profile. On first open it stages a writable game copy and presents Play. Allow space for both copies. Store clients, saves outside the game folder and globally installed prerequisites are separate.
 
 [Native build guide](docs/NATIVE-BUILD.md) · [Architecture](docs/ARCHITECTURE.md) · [Issues](https://github.com/Niimahz/Anker-port/issues) · [Press kit and shareable artwork](docs/PRESS-KIT.md)
 

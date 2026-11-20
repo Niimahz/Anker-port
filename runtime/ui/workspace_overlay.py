@@ -168,6 +168,7 @@ def install(root: Path):
     icon = root / "Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png"
     icon.write_bytes(Path(__file__).with_name("PortIcon.png").read_bytes())
     pages.write_text(settings.replace(first, credit + "\n" + first))
+    change("                // A Play error sits under Play.", "                PortExportSection(entry: entry)\n                // A Play error sits under Play.")
     path.write_text(source)
 
     # Keep lookup keys and the on-disk format stable. SwiftUI resolves display
@@ -184,4 +185,10 @@ def install(root: Path):
                     unit["value"] = unit["value"].replace("Madeira", "Anker Port")
     catalog.write_text(json.dumps(data, ensure_ascii=False))
     content = root / "ContentView.swift"
-    content.write_text(content.read_text().replace('.navigationTitle("Madeira")', '.navigationTitle("Anker Port")'))
+    view = content.read_text()
+    marker = "                } else if library.enabled {"
+    if view.count(marker) != 1:
+        raise ValueError("Unexpected game launch entry point")
+    view = view.replace("if library.enabled && library.current != nil {", "if (library.enabled || PortGamePackage.standalone) && library.current != nil {")
+    view = view.replace(marker, "                } else if PortGamePackage.standalone {\n                    PortSingleGame(play: launchLibraryEntry)\n" + marker)
+    content.write_text(view.replace('.navigationTitle("Madeira")', '.navigationTitle("Anker Port")'))

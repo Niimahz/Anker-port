@@ -7,6 +7,7 @@ on:
       - 'runtime/tools/integrate-upstream.py'
       - 'runtime/ui/**'
       - 'runtime/tools/prepare-archives.sh'
+      - 'runtime/tools/embed-export-template.py'
       - 'runtime/tools/prepare-swift-catalog.py'
       - 'runtime/tools/brand-upstream.py'
       - 'runtime/tools/verify-ipa.py'
@@ -344,7 +345,7 @@ jobs:
       - name: Verify and package user-signable IPA
         run: |
           mkdir -p dist
-          cp native-src/dist/Madeira.ipa dist/AnkerPort-unsigned.ipa
+          python3 runtime/tools/embed-export-template.py native-src/dist/Madeira.ipa dist/AnkerPort-unsigned.ipa
           python3 runtime/tools/verify-ipa.py dist/AnkerPort-unsigned.ipa --revision "$(git -C native-src rev-parse HEAD)"
           shasum -a 256 dist/AnkerPort-unsigned.ipa > dist/SHA256SUMS
       - uses: actions/upload-artifact@v6

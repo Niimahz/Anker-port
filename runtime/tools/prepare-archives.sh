@@ -27,7 +27,8 @@ cmake -S "$build/archive" -B "$build/build" "${common[@]}" \
 grep -Eq '^#define HAVE_LIBZSTD 1' "$build/build/config.h"
 cmake --build "$build/build" --target archive_static --parallel 4
 libtool -static -o "$app/libankerarchives.a" "$build/build/libarchive/libarchive.a" "$lzma" "$zstd"
-cp "$build/archive/libarchive/"{archive.h,archive_entry.h} runtime/ui/AnkerArchive.h "$app/"
+cp "$build/archive/libarchive/"{archive.h,archive_entry.h} runtime/ui/AnkerArchive.h runtime/ui/PortIPA.h "$app/"
+echo '#include "PortIPA.h"' >> "$app/Madeira-Bridging-Header.h"
 echo '#include "AnkerArchive.h"' >> "$app/Madeira-Bridging-Header.h"
 python3 - "$1/app/Madeira.xcodeproj/project.pbxproj" <<'PY'
 import sys

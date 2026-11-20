@@ -748,6 +748,7 @@ struct AnkerNativeDownloads: View {
 '''
 assets = Path(__file__).resolve().parents[1] / "ui"
 original += "\n" + (assets / "AnkerWorkspace.swift").read_text()
+original += "\n" + (assets / "PortGameExport.swift").read_text()
 library = source.with_name("Library.swift")
 if library.exists():
     from importlib.util import module_from_spec, spec_from_file_location
