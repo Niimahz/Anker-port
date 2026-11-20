@@ -478,14 +478,14 @@ struct AnkerNativeDownloads: View {
         let jitState = jit.busy ? "Connecting" : (jit.status ?? "Not checked")
         return [
             "Anker Port runtime diagnostic",
-            "Generated: \\(Date().formatted(.iso8601))",
-            "Library entries: \\(library.entries.count)",
-            "JIT method: \\(jit.resolvedMethod.title)",
-            "JIT state: \\(jitState)",
-            "JIT error: \\(jit.error ?? "None reported")",
-            "Library error: \\(library.error ?? "None reported")",
+            "Generated: \(Date().formatted(.iso8601))",
+            "Library entries: \(library.entries.count)",
+            "JIT method: \(jit.resolvedMethod.title)",
+            "JIT state: \(jitState)",
+            "JIT error: \(jit.error ?? "None reported")",
+            "Library error: \(library.error ?? "None reported")",
             "Note: This is a status snapshot, not proof that an EXE launched."
-        ].joined(separator: "\\n")
+        ].joined(separator: "\n")
     }
 
     private var runtimeHealth: some View {
