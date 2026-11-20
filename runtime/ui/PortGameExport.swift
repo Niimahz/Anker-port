@@ -1,3 +1,6 @@
+import WebKit
+import UniformTypeIdentifiers
+
 // Appended to the native target alongside the Anker workspace.
 private struct PortGamePackageError: LocalizedError {
     let message: String
@@ -17,7 +20,24 @@ enum PortGamePackage {
         return LibraryModel.drive.appendingPathComponent(parts.prefix(3).joined(separator: "/"), isDirectory: true)
     }
 
-    static func export(_ entry: LibraryEntry, root: URL, executable: URL) throws -> URL {
+    static func webIndex(for executable: URL, inside root: URL) -> URL? {
+        let base = executable.deletingLastPathComponent()
+        let source = root.resolvingSymlinksInPath().standardizedFileURL.path + "/"
+        for directory in [base.appendingPathComponent("www"), base] {
+            func has(_ path: String) -> Bool {
+                let file = directory.appendingPathComponent(path).resolvingSymlinksInPath().standardizedFileURL
+                return file.path.hasPrefix(source) &&
+                    (try? file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+            }
+            if has("index.html"), has("js/main.js"), has("data/System.json"),
+               has("js/rpg_core.js") || has("js/rmmz_core.js") {
+                return directory.appendingPathComponent("index.html").resolvingSymlinksInPath().standardizedFileURL
+            }
+        }
+        return nil
+    }
+
+    static func export(_ entry: LibraryEntry, root: URL, executable: URL, jitless: Bool) throws -> URL {
         let fm = FileManager.default
         let source = root.resolvingSymlinksInPath().standardizedFileURL
         let exe = executable.resolvingSymlinksInPath().standardizedFileURL
@@ -27,6 +47,10 @@ enum PortGamePackage {
               exe.pathExtension.lowercased() == "exe", fm.fileExists(atPath: exe.path) else {
             throw PortGamePackageError("Select the individual game folder containing this EXE and its assets.")
         }
+        let index = jitless ? webIndex(for: exe, inside: source) : nil
+        if jitless && index == nil {
+            throw PortGamePackageError("JITless export needs RPG Maker MV or MZ browser assets beside the game EXE.")
+        }
         let seedInfo = try Data(contentsOf: Bundle.main.bundleURL.appendingPathComponent("PortSeed.plist"))
         guard let metadata = try PropertyListSerialization.propertyList(from: seedInfo, format: nil) as? [String: Any],
               var info = metadata["info"] as? [String: Any], let prefix = metadata["prefix"] as? String else {
@@ -34,9 +58,13 @@ enum PortGamePackage {
         }
         let temp = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try fm.createDirectory(at: temp, withIntermediateDirectories: true)
-        let exported = temp.appendingPathComponent("Game-" + entry.id.uuidString + ".ipa")
+        let exported = temp.appendingPathComponent("Game-" + entry.id.uuidString + (jitless ? "-JITless.ipa" : "-WithJIT.ipa"))
         do {
             info["CFBundleIdentifier"] = "app.ankerport.game.g" + entry.id.uuidString.lowercased().replacingOccurrences(of: "-", with: "")
+            if let index {
+                info["AnkerWebIndex"] = String(index.path.dropFirst(source.path.count + 1))
+                info["CFBundleIdentifier"] = "app.ankerport.game.web.g" + entry.id.uuidString.lowercased().replacingOccurrences(of: "-", with: "")
+            }
             info["CFBundleDisplayName"] = entry.title
             info["CFBundleName"] = entry.title
             let plist = temp.appendingPathComponent("Info.plist")
@@ -90,6 +118,48 @@ enum PortGamePackage {
     }
 }
 
+// Give the game's scripts a single origin and access only to their own assets.
+private final class PortWebAssets: NSObject, WKURLSchemeHandler {
+    let directory: URL
+    init(directory: URL) { self.directory = directory.resolvingSymlinksInPath().standardizedFileURL }
+
+    func webView(_ webView: WKWebView, start task: WKURLSchemeTask) {
+        guard let url = task.request.url, url.host == "game" else {
+            task.didFailWithError(URLError(.badURL))
+            return
+        }
+        let file = directory.appendingPathComponent(url.path).resolvingSymlinksInPath().standardizedFileURL
+        guard file.path.hasPrefix(directory.path + "/") else {
+            task.didFailWithError(URLError(.noPermissionsToReadFile))
+            return
+        }
+        do {
+            let bytes = try Data(contentsOf: file, options: .mappedIfSafe)
+            let mime = UTType(filenameExtension: file.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
+            task.didReceive(URLResponse(url: url, mimeType: mime, expectedContentLength: bytes.count, textEncodingName: nil))
+            task.didReceive(bytes)
+            task.didFinish()
+        } catch { task.didFailWithError(error) }
+    }
+
+    func webView(_ webView: WKWebView, stop task: WKURLSchemeTask) {}
+}
+
+private struct PortWebGame: UIViewRepresentable {
+    let directory: URL
+
+    func makeUIView(context: Context) -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        configuration.allowsInlineMediaPlayback = true
+        configuration.setURLSchemeHandler(PortWebAssets(directory: directory), forURLScheme: "ankergame")
+        let view = WKWebView(frame: .zero, configuration: configuration)
+        view.load(URLRequest(url: URL(string: "ankergame://game/index.html")!))
+        return view
+    }
+
+    func updateUIView(_ view: WKWebView, context: Context) {}
+}
+
 struct PortSingleGame: View {
     let play: (LibraryEntry) -> Void
     @ObservedObject private var model = LibraryModel.shared
@@ -97,6 +167,20 @@ struct PortSingleGame: View {
     @State private var failure: String?
     @State private var loading = false
     var body: some View {
+        if let index = Bundle.main.object(forInfoDictionaryKey: "AnkerWebIndex") as? String {
+            let root = Bundle.main.bundleURL.appendingPathComponent("PortGameFiles")
+            let page = root.appendingPathComponent(index).standardizedFileURL
+            if page.path.hasPrefix(root.path + "/"), FileManager.default.fileExists(atPath: page.path) {
+                PortWebGame(directory: page.deletingLastPathComponent())
+            } else {
+                Text("The packaged game is missing its web entry point.")
+            }
+        } else {
+            windowsLauncher
+        }
+    }
+
+    private var windowsLauncher: some View {
         VStack(spacing: 18) {
             PortMark().frame(width: 70, height: 60)
             Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Game").font(.largeTitle.bold())
@@ -130,6 +214,7 @@ struct PortExportSection: View {
     let entry: LibraryEntry
     @State private var choose = false
     @State private var confirm = false
+    @State private var supportsWeb = false
     @State private var folder: URL?
     @State private var busy = false
     @State private var message = ""
@@ -140,25 +225,34 @@ struct PortExportSection: View {
         if !PortGamePackage.standalone && entry.relativePath.lowercased().hasSuffix(".exe") && entry.desktop != true {
             Section {
                 Button {
-                    if let root = PortGamePackage.importedRoot(entry) { folder = root; confirm = true }
+                    if let root = PortGamePackage.importedRoot(entry) { select(root) }
                     else { choose = true }
                 } label: { Label("Export game IPA", systemImage: "shippingbox") }.disabled(busy)
                 if busy { ProgressView("Packaging runtime and game files…") }
                 if !message.isEmpty { Text(message).font(.footnote) }
-            } footer: { Text("Includes every file in the selected game folder and a separate runtime. The unsigned app needs signing or LiveContainer and JIT. Store clients and system-wide dependencies may need separate setup.") }
+            } footer: { Text("Includes every file in the selected game folder and a separate runtime. Choose With JIT for Windows execution or JITless for games with RPG Maker MV/MZ browser assets. Windows-only plugins require With JIT. Store clients and system-wide dependencies may need separate setup.") }
             .fileImporter(isPresented: $choose, allowedContentTypes: [.folder]) { value in
-                do { folder = try value.get(); confirm = true } catch { message = error.localizedDescription }
+                do { select(try value.get()) } catch { message = error.localizedDescription }
             }
-            .confirmationDialog("Include the entire game folder?", isPresented: $confirm) {
-                Button("Create IPA") { if let folder { Task { await build(folder) } } }
+            .confirmationDialog("Export game IPA", isPresented: $confirm, titleVisibility: .visible) {
+                Button("With JIT") { if let folder { Task { await build(folder, jitless: false) } } }
+                Button("JITless · RPG Maker Web") { if let folder { Task { await build(folder, jitless: true) } } }.disabled(!supportsWeb)
                 Button("Cancel", role: .cancel) {}
-            } message: { Text(folder?.lastPathComponent ?? "") }
+            } message: { Text("Includes the entire game folder. " + (supportsWeb ? "Browser assets detected. Windows-only plugins may be incompatible." : "JITless unavailable for this game: no RPG Maker MV/MZ browser assets found.")) }
             .sheet(isPresented: $saving, onDismiss: clean) {
                 if let result { PortSaveIPA(url: result) }
             }
         }
     }
-    @MainActor private func build(_ root: URL) async {
+    @MainActor private func select(_ root: URL) {
+        let access = root.startAccessingSecurityScopedResource()
+        defer { if access { root.stopAccessingSecurityScopedResource() } }
+        folder = root
+        supportsWeb = (try? LibraryModel.executable(entry.relativePath)).flatMap { PortGamePackage.webIndex(for: $0, inside: root) } != nil
+        confirm = true
+    }
+
+    @MainActor private func build(_ root: URL, jitless: Bool) async {
         guard !busy else { return }
         busy = true; message = ""
         defer { busy = false }
@@ -167,7 +261,7 @@ struct PortExportSection: View {
         do {
             let exe = try LibraryModel.executable(entry.relativePath)
             let e = entry
-            result = try await Task.detached(priority: .userInitiated) { try PortGamePackage.export(e, root: root, executable: exe) }.value
+            result = try await Task.detached(priority: .userInitiated) { try PortGamePackage.export(e, root: root, executable: exe, jitless: jitless) }.value
             saving = true
         } catch { message = error.localizedDescription }
     }
