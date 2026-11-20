@@ -160,9 +160,13 @@ private final class AnkerDownloadModel: ObservableObject {
             // A Windows EXE often depends on DLLs and assets beside it.
             // Import its containing directory, not the EXE alone.
             let sourceFolder = file.deletingLastPathComponent()
+            var traversalError: Error?
             guard let walker = FileManager.default.enumerator(
                 at: sourceFolder, includingPropertiesForKeys: [.isSymbolicLinkKey],
-                options: [], errorHandler: { _, _ in false }) else {
+                options: [], errorHandler: { _, error in
+                    traversalError = error
+                    return false
+                }) else {
                 throw NSError(domain: "AnkerImport", code: 2, userInfo: [
                     NSLocalizedDescriptionKey: "Cannot inspect the executable's game folder."
                 ])
@@ -175,6 +179,7 @@ private final class AnkerDownloadModel: ObservableObject {
                     ])
                 }
             }
+            if let traversalError { throw traversalError }
             let destination = targetFolder.appendingPathComponent(
                 UUID().uuidString + "-" + sourceFolder.lastPathComponent, isDirectory: true)
             try FileManager.default.copyItem(at: sourceFolder, to: destination)
@@ -210,9 +215,13 @@ private final class AnkerDownloadModel: ObservableObject {
             }
             // Reject links before copying: a linked asset could escape the selected
             // game tree, while Wine expects a self-contained drive_c directory.
+            var traversalError: Error?
             guard let preflight = FileManager.default.enumerator(
                 at: source, includingPropertiesForKeys: [.isSymbolicLinkKey],
-                options: [], errorHandler: { _, _ in false }) else {
+                options: [], errorHandler: { _, error in
+                    traversalError = error
+                    return false
+                }) else {
                 status = "Cannot inspect the selected game folder."
                 return
             }
@@ -226,6 +235,10 @@ private final class AnkerDownloadModel: ObservableObject {
                 if values.isRegularFile == true && item.pathExtension.lowercased() == "exe" {
                     containsExecutable = true
                 }
+            }
+            if let traversalError {
+                status = "Cannot read the complete game folder: " + traversalError.localizedDescription
+                return
             }
             guard containsExecutable else {
                 status = "No Windows EXE found; nothing was copied."
