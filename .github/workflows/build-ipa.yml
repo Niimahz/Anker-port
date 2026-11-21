@@ -205,6 +205,13 @@ jobs:
           assert "Pass it when the toolchain defines it" not in script.read_text()
           print("Disabled upstream Xcode 27 shader rewrite for macos-15")
           PY
+      - name: Apply Madeira's iOS OpenGL pointer conversions before compiling Wine
+        working-directory: native-src/wine
+        run: |
+          set -euo pipefail
+          git apply --check ../patches/wine-opengl-winios.patch
+          git apply ../patches/wine-opengl-winios.patch
+          git apply --reverse --check ../patches/wine-opengl-winios.patch
       - name: Build and validate Wine i386 resources before the full IPA build
         working-directory: native-src
         run: |
