@@ -1,3 +1,4 @@
+import Darwin
 import WebKit
 import UniformTypeIdentifiers
 
@@ -12,6 +13,12 @@ enum PortGamePackage {
     static var seed: URL { Bundle.main.bundleURL.appendingPathComponent("PortSeed.bin") }
     static var profile: URL { Bundle.main.bundleURL.appendingPathComponent("PortGame.json") }
     static var standalone: Bool { FileManager.default.fileExists(atPath: profile.path) }
+
+    static func savedIPA(_ id: UUID, jitless: Bool) -> URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("AnkerExports", isDirectory: true)
+            .appendingPathComponent("Game-" + id.uuidString + (jitless ? "-JITless.ipa" : "-WithJIT.ipa"))
+    }
 
     static func importedRoot(_ entry: LibraryEntry) -> URL? {
         let parts = entry.relativePath.split(separator: "/")
@@ -76,7 +83,8 @@ enum PortGamePackage {
         }
         let temp = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try fm.createDirectory(at: temp, withIntermediateDirectories: true)
-        let exported = temp.appendingPathComponent("Game-" + entry.id.uuidString + (jitless ? "-JITless.ipa" : "-WithJIT.ipa"))
+        let destination = savedIPA(entry.id, jitless: jitless)
+        let exported = temp.appendingPathComponent(destination.lastPathComponent)
         do {
             info["CFBundleIdentifier"] = "app.ankerport.game.g" + entry.id.uuidString.lowercased().replacingOccurrences(of: "-", with: "")
             if let index {
@@ -119,10 +127,13 @@ enum PortGamePackage {
             guard port_build_ipa(seed.path, prefix, payload.path, plist.path, manifest.path, exported.path, &error, 512) == 0 else {
                 throw PortGamePackageError(String(cString: error))
             }
-            if useBoxedWine { try fm.removeItem(at: payload) }
-            try fm.removeItem(at: plist)
-            try fm.removeItem(at: manifest)
-            return exported
+            try fm.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+            // Publish only the completed file, atomically replacing the previous export of this mode.
+            guard rename(exported.path, destination.path) == 0 else {
+                throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+            }
+            try? fm.removeItem(at: temp)
+            return destination
         } catch {
             try? fm.removeItem(at: temp)
             throw error
@@ -271,7 +282,10 @@ struct PortExportSection: View {
     @State private var folder: URL?
     @State private var busy = false
     @State private var message = ""
+    @State private var files: [URL] = []
     @State private var result: URL?
+    @State private var removal: URL?
+    @State private var confirmRemoval = false
     @State private var saving = false
 
     var body: some View {
@@ -282,6 +296,16 @@ struct PortExportSection: View {
                     else { choose = true }
                 } label: { Label("Export game IPA", systemImage: "shippingbox") }.disabled(busy)
                 if busy { ProgressView("Packaging runtime and game files…") }
+                ForEach(files, id: \.self) { file in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(file.lastPathComponent.hasSuffix("-JITless.ipa") ? "JITless IPA" : "With JIT IPA")
+                        HStack {
+                            Button("Save to Files") { result = file; saving = true }
+                            Spacer()
+                            Button("Remove", role: .destructive) { removal = file; confirmRemoval = true }
+                        }.buttonStyle(.borderless)
+                    }.disabled(busy)
+                }
                 if !message.isEmpty { Text(message).font(.footnote) }
             } footer: { Text("Includes the selected game folder and runtime for use on another device without Anker Port. Choose With JIT for 32-bit x86 and 64-bit x64 Windows EXEs or JITless for RPG Maker web games and experimental 32-bit Windows emulation. Store clients and system-wide dependencies may need separate setup.") }
             .fileImporter(isPresented: $choose, allowedContentTypes: [.folder]) { value in
@@ -292,7 +316,18 @@ struct PortExportSection: View {
                 Button(supportsWeb ? "JITless · RPG Maker Web" : "JITless · Win32 (Experimental)") { if let folder { Task { await build(folder, jitless: true) } } }.disabled(!supportsWeb && !supportsWin32)
                 Button("Cancel", role: .cancel) {}
             } message: { Text("Includes the entire game folder. " + (supportsWeb ? "Browser assets detected. Windows-only plugins may be incompatible." : (supportsWin32 ? "32-bit x86 EXE detected. Older lightweight games are the intended use. Graphics, DLL support and speed vary." : "JITless needs a 32-bit x86 Windows game or RPG Maker web assets."))) }
-            .sheet(isPresented: $saving, onDismiss: clean) {
+            .onAppear { refreshFiles() }
+            .alert("Remove exported IPA?", isPresented: $confirmRemoval, presenting: removal) { file in
+                Button("Remove", role: .destructive) {
+                    do {
+                        try FileManager.default.removeItem(at: file)
+                        message = "Export removed."
+                    } catch { message = error.localizedDescription }
+                    refreshFiles()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: { _ in Text("Only this saved IPA will be deleted. Your installed game stays in the library.") }
+            .sheet(isPresented: $saving) {
                 if let result { PortSaveIPA(url: result) }
             }
         }
@@ -316,12 +351,13 @@ struct PortExportSection: View {
         do {
             let exe = try LibraryModel.executable(entry.relativePath)
             let e = entry
-            result = try await Task.detached(priority: .userInitiated) { try PortGamePackage.export(e, root: root, executable: exe, jitless: jitless) }.value
-            saving = true
+            _ = try await Task.detached(priority: .userInitiated) { try PortGamePackage.export(e, root: root, executable: exe, jitless: jitless) }.value
+            refreshFiles()
+            message = "Saved in Documents/AnkerExports."
         } catch { message = error.localizedDescription }
     }
-    private func clean() {
-        if let result { try? FileManager.default.removeItem(at: result.deletingLastPathComponent()) }
-        result = nil
+    private func refreshFiles() {
+        files = [false, true].map { PortGamePackage.savedIPA(entry.id, jitless: $0) }
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
     }
 }
