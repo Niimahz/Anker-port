@@ -1,0 +1,19 @@
+name: Anker Madeira integration smoke tests
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tests/**'
+      - 'runtime/tools/integrate-upstream.py'
+      - '.github/workflows/integration-smoke.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  integration-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run integration smoke tests
+        run: python3 -m unittest discover -s tests -p 'test_integration_smoke.py' -v
