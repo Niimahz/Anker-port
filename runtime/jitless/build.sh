@@ -21,6 +21,11 @@ s = p.read_text().replace("#ifndef __TEST", "#if 0 // standalone SDL_main suppli
 p.write_text(s)
 p = Path("platform/linux/platform.cpp")
 s = p.read_text().replace("#ifndef __MACH__\nint getPixelFormats", "#if 1\nint getPixelFormats", 1)
+old_flush = "__builtin___clear_cache((char*)address, (char*)address+len);"
+if old_flush in s:
+    s = "#include <libkern/OSCacheControl.h>\n" + s.replace(old_flush, "sys_icache_invalidate(address, len);", 1)
+elif "sys_icache_invalidate(address, len);" not in s:
+    raise SystemExit("Unexpected Boxedwine cache flush implementation")
 p.write_text(s)
 PY
 sources=(source/sdl/*.cpp source/sdl/singleThreaded/*.cpp platform/sdl/*.cpp platform/linux/platform.cpp
