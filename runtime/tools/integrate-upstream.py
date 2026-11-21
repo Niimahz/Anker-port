@@ -160,6 +160,16 @@ private final class AnkerDownloadModel: ObservableObject {
             // A Windows EXE often depends on DLLs and assets beside it.
             // Import its containing directory, not the EXE alone.
             let sourceFolder = file.deletingLastPathComponent()
+            // Avoid copying the managed game drive into itself.
+            let sourcePath = sourceFolder.standardizedFileURL.resolvingSymlinksInPath().path
+            let importPath = targetFolder.standardizedFileURL.resolvingSymlinksInPath().path
+            guard sourcePath != importPath,
+                  !importPath.hasPrefix(sourcePath + "/"),
+                  !sourcePath.hasPrefix(importPath + "/") else {
+                throw NSError(domain: "AnkerImport", code: 4, userInfo: [
+                    NSLocalizedDescriptionKey: "Choose an external game folder, not the managed game drive."
+                ])
+            }
             var traversalError: Error?
             guard let walker = FileManager.default.enumerator(
                 at: sourceFolder, includingPropertiesForKeys: [.isSymbolicLinkKey],
@@ -244,8 +254,17 @@ private final class AnkerDownloadModel: ObservableObject {
                 status = "No Windows EXE found; nothing was copied."
                 return
             }
-            let destination = LibraryModel.drive
+            let importRoot = LibraryModel.drive
                 .appendingPathComponent("Games/AnkerImports", isDirectory: true)
+            let sourcePath = source.standardizedFileURL.resolvingSymlinksInPath().path
+            let importPath = importRoot.standardizedFileURL.resolvingSymlinksInPath().path
+            guard sourcePath != importPath,
+                  !importPath.hasPrefix(sourcePath + "/"),
+                  !sourcePath.hasPrefix(importPath + "/") else {
+                status = "Choose an external game folder, not the managed game drive."
+                return
+            }
+            let destination = importRoot
                 .appendingPathComponent(UUID().uuidString + "-" + source.lastPathComponent, isDirectory: true)
             try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(),
                                                     withIntermediateDirectories: true)
