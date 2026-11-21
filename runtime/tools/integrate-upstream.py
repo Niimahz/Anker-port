@@ -498,6 +498,18 @@ struct AnkerNativeDownloads: View {
         return "Unclassified error (details remain on device)"
     }
 
+    // The upstream library error may include absolute paths and game names.
+    // Keep the shared report categorical; full details remain on the device.
+    private var ankerLibraryErrorCategory: String {
+        guard let error = library.error, !error.isEmpty else { return "None reported" }
+        let normalized = error.lowercased()
+        if normalized.contains("permission") || normalized.contains("denied") { return "Permission denied" }
+        if normalized.contains("not found") || normalized.contains("missing") || normalized.contains("no such file") { return "Missing file" }
+        if normalized.contains("space") || normalized.contains("storage") || normalized.contains("disk full") { return "Storage problem" }
+        if normalized.contains("invalid") || normalized.contains("unsupported") || normalized.contains("format") { return "Invalid or unsupported executable" }
+        return "Unclassified error (details remain on device)"
+    }
+
     private var ankerRuntimeDiagnostic: String {
         let jitState = jit.busy ? "Connecting" : (jit.status ?? "Not checked")
         return [
@@ -508,7 +520,7 @@ struct AnkerNativeDownloads: View {
             "JIT state: \(jitState)",
             "JIT error category: \(ankerJITErrorCategory)",
             "JIT execution verified: No (status snapshot only)",
-            "Library error: \(library.error ?? "None reported")",
+            "Library error: \(ankerLibraryErrorCategory)",
             "Note: This is a status snapshot, not proof that an EXE launched."
         ].joined(separator: "\n")
     }
