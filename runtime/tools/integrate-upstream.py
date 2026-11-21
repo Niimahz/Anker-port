@@ -223,6 +223,16 @@ private final class AnkerDownloadModel: ObservableObject {
                 status = "Select an extracted game folder."
                 return
             }
+            let importRoot = LibraryModel.drive
+                .appendingPathComponent("Games/AnkerImports", isDirectory: true)
+            let sourcePath = source.standardizedFileURL.resolvingSymlinksInPath().path
+            let importPath = importRoot.standardizedFileURL.resolvingSymlinksInPath().path
+            guard sourcePath != importPath,
+                  !importPath.hasPrefix(sourcePath + "/"),
+                  !sourcePath.hasPrefix(importPath + "/") else {
+                status = "Choose an external game folder, not the managed game drive."
+                return
+            }
             // Reject links before copying: a linked asset could escape the selected
             // game tree, while Wine expects a self-contained drive_c directory.
             var traversalError: Error?
@@ -252,16 +262,6 @@ private final class AnkerDownloadModel: ObservableObject {
             }
             guard containsExecutable else {
                 status = "No Windows EXE found; nothing was copied."
-                return
-            }
-            let importRoot = LibraryModel.drive
-                .appendingPathComponent("Games/AnkerImports", isDirectory: true)
-            let sourcePath = source.standardizedFileURL.resolvingSymlinksInPath().path
-            let importPath = importRoot.standardizedFileURL.resolvingSymlinksInPath().path
-            guard sourcePath != importPath,
-                  !importPath.hasPrefix(sourcePath + "/"),
-                  !sourcePath.hasPrefix(importPath + "/") else {
-                status = "Choose an external game folder, not the managed game drive."
                 return
             }
             let destination = importRoot
