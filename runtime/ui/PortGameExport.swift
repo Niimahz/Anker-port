@@ -196,6 +196,31 @@ private final class PortWebAssets: NSObject, WKURLSchemeHandler {
     func webView(_ webView: WKWebView, stop task: WKURLSchemeTask) {}
 }
 
+// The native Metal surface sits above SwiftUI. Pin the tag to the actual
+// rendering view in both engines so it follows rotation and stays touch-transparent.
+@MainActor
+private final class PortGameWatermark: UILabel {
+    static func attach(to surface: UIView) {
+        guard PortGamePackage.standalone,
+              !surface.subviews.contains(where: { $0 is PortGameWatermark }) else { return }
+        let label = PortGameWatermark(frame: .zero)
+        label.text = "Anker Port"
+        label.font = .systemFont(ofSize: 10, weight: .semibold)
+        label.textColor = UIColor.white.withAlphaComponent(0.65)
+        label.shadowColor = UIColor.black.withAlphaComponent(0.75)
+        label.shadowOffset = CGSize(width: 0, height: 1)
+        label.isUserInteractionEnabled = false
+        label.isAccessibilityElement = false
+        label.translatesAutoresizingMaskIntoConstraints = false
+        surface.addSubview(label)
+        let safe = surface.safeAreaLayoutGuide
+        NSLayoutConstraint.activate([
+            label.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -10),
+            label.bottomAnchor.constraint(equalTo: safe.bottomAnchor, constant: -5)
+        ])
+    }
+}
+
 private struct PortWebGame: UIViewRepresentable {
     let directory: URL
 
@@ -214,6 +239,7 @@ private struct PortWebGame: UIViewRepresentable {
         }
         configuration.setURLSchemeHandler(PortWebAssets(directory: directory, gameArchive: gameArchive), forURLScheme: "ankergame")
         let view = WKWebView(frame: .zero, configuration: configuration)
+        PortGameWatermark.attach(to: view)
         view.load(URLRequest(url: URL(string: "ankergame://game/index.html")!))
         return view
     }
@@ -249,7 +275,7 @@ struct PortSingleGame: View {
             Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Game").font(.largeTitle.bold())
             if loading { ProgressView("Preparing game files…") }
             if let error = failure ?? model.error { Text(error).font(.footnote).foregroundStyle(.secondary) }
-            if let ready { Button("Play") { model.error = nil; play(ready) }.buttonStyle(.borderedProminent) }
+            if let ready { Button("Play") { model.error = nil; PortGameWatermark.attach(to: MetalHostView.shared); play(ready) }.buttonStyle(.borderedProminent) }
             else if failure != nil { Button("Retry") { Task { await prepare() } } }
         }.padding().task { if ready == nil && failure == nil { await prepare() } }
     }
