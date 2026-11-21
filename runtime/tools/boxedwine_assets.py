@@ -28,7 +28,17 @@ def add_runtime(archive, prefix, source):
         Config.WorkingDir = '/home/username/.wine/dosdevices/d:/' + path.join('/');
         Config.appZipFile = 'game.zip';
     };
-    Config.storageMode = STORAGE_LOCAL_STORAGE;
+    // Custom WebKit origins can restrict storage. Probe the actual writable store
+    // before Boxedwine attempts to mount its filesystem.
+    try {
+        const key = 'anker-boxedwine-write-test';
+        localStorage.setItem(key, '1');
+        localStorage.removeItem(key);
+        Config.storageMode = STORAGE_LOCAL_STORAGE;
+    } catch {
+        Config.storageMode = STORAGE_MEMORY;
+        console.warn('Persistent storage unavailable. Saves last for this session only.');
+    }
     document.getElementById('showConsole').checked = false;
     window.addEventListener('error', event => {
         const status = document.getElementById('status');

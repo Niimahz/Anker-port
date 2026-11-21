@@ -14,9 +14,9 @@ enum PortGamePackage {
     static var profile: URL { Bundle.main.bundleURL.appendingPathComponent("PortGame.json") }
     static var standalone: Bool { FileManager.default.fileExists(atPath: profile.path) }
 
-    static func savedIPA(_ id: UUID, jitless: Bool) -> URL {
+    static func savedIPA(_ id: UUID, jitless: Bool, legacy: Bool = false) -> URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("AnkerExports", isDirectory: true)
+            .appendingPathComponent(legacy ? "AnkerExports" : "Anker IPA", isDirectory: true)
             .appendingPathComponent("Game-" + id.uuidString + (jitless ? "-JITless.ipa" : "-WithJIT.ipa"))
     }
 
@@ -187,7 +187,12 @@ private final class PortWebAssets: NSObject, WKURLSchemeHandler {
         do {
             let bytes = try Data(contentsOf: file, options: .mappedIfSafe)
             let mime = UTType(filenameExtension: file.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
-            task.didReceive(URLResponse(url: url, mimeType: mime, expectedContentLength: bytes.count, textEncodingName: nil))
+            // BrowserFS accepts archive reads only when XHR reports HTTP 200.
+            guard let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": mime, "Content-Length": String(bytes.count)]) else {
+                throw URLError(.badServerResponse)
+            }
+            task.didReceive(response)
             task.didReceive(bytes)
             task.didFinish()
         } catch { task.didFailWithError(error) }
@@ -291,14 +296,6 @@ struct PortSingleGame: View {
     }
 }
 
-private struct PortSaveIPA: UIViewControllerRepresentable {
-    let url: URL
-    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        UIDocumentPickerViewController(forExporting: [url], asCopy: true)
-    }
-    func updateUIViewController(_ controller: UIDocumentPickerViewController, context: Context) {}
-}
-
 struct PortExportSection: View {
     let entry: LibraryEntry
     @State private var choose = false
@@ -309,10 +306,8 @@ struct PortExportSection: View {
     @State private var busy = false
     @State private var message = ""
     @State private var files: [URL] = []
-    @State private var result: URL?
     @State private var removal: URL?
     @State private var confirmRemoval = false
-    @State private var saving = false
 
     var body: some View {
         if !PortGamePackage.standalone && entry.relativePath.lowercased().hasSuffix(".exe") && entry.desktop != true {
@@ -326,7 +321,7 @@ struct PortExportSection: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(file.lastPathComponent.hasSuffix("-JITless.ipa") ? "JITless IPA" : "With JIT IPA")
                         HStack {
-                            Button("Save to Files") { result = file; saving = true }
+                            Text(file.deletingLastPathComponent().lastPathComponent + "/" + file.lastPathComponent).font(.caption).textSelection(.enabled)
                             Spacer()
                             Button("Remove", role: .destructive) { removal = file; confirmRemoval = true }
                         }.buttonStyle(.borderless)
@@ -353,9 +348,7 @@ struct PortExportSection: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: { _ in Text("Only this saved IPA will be deleted. Your installed game stays in the library.") }
-            .sheet(isPresented: $saving) {
-                if let result { PortSaveIPA(url: result) }
-            }
+
         }
     }
     @MainActor private func select(_ root: URL) {
@@ -379,11 +372,21 @@ struct PortExportSection: View {
             let e = entry
             _ = try await Task.detached(priority: .userInitiated) { try PortGamePackage.export(e, root: root, executable: exe, jitless: jitless) }.value
             refreshFiles()
-            message = "Saved in Documents/AnkerExports."
+            message = "Saved to Files → On My iPhone → Anker Port → Anker IPA."
         } catch { message = error.localizedDescription }
     }
     private func refreshFiles() {
-        files = [false, true].map { PortGamePackage.savedIPA(entry.id, jitless: $0) }
-            .filter { FileManager.default.fileExists(atPath: $0.path) }
+        let fm = FileManager.default
+        files = [false, true].flatMap { jitless -> [URL] in
+            let current = PortGamePackage.savedIPA(entry.id, jitless: jitless)
+            let old = PortGamePackage.savedIPA(entry.id, jitless: jitless, legacy: true)
+            if fm.fileExists(atPath: old.path), !fm.fileExists(atPath: current.path) {
+                do {
+                    try fm.createDirectory(at: current.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    try fm.moveItem(at: old, to: current)
+                } catch { message = error.localizedDescription }
+            }
+            return [current, old].filter { fm.fileExists(atPath: $0.path) }
+        }
     }
 }
