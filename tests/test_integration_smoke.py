@@ -15,7 +15,7 @@ class AnkerIntegrationSmokeTests(unittest.TestCase):
             app = Path(temporary) / "app/Madeira"
             app.mkdir(parents=True)
             target = app / "MadeiraApp.swift"
-            target.write_text("import SwiftUI\nstruct MadeiraApp {\n    ContentView()\n}\n")
+            target.write_text("import SwiftUI\nstruct MadeiraApp {\n            ContentView()\n}\n")
             def integrate():
                 return subprocess.run(
                     [sys.executable, str(INTEGRATOR), temporary],
