@@ -8,7 +8,7 @@ import struct
 import tarfile
 from pathlib import Path
 import zipfile
-from boxedwine_assets import ASSETS
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("ipa", type=Path)
@@ -77,12 +77,15 @@ with zipfile.ZipFile(args.ipa) as archive:
     with archive.open(prefix + "PortSeed.bin") as raw, zipfile.ZipFile(raw) as seed:
         for member in archive.infolist():
             if member.filename.startswith(prefix) and member.filename not in {
-                    prefix + "PortSeed.bin", prefix + "PortSeed.plist"}:
+                    prefix + "PortSeed.bin", prefix + "PortSeed.plist", prefix + "PortNativeSeed.bin"}:
                 embedded = seed.getinfo(member.filename)
                 assert (embedded.file_size, embedded.CRC) == (member.file_size, member.CRC), member.filename
-        for asset in (*ASSETS, "index.html", "module.js"):
-            assert seed.getinfo(prefix + "PortBoxedWine/" + asset).file_size > 0, asset
         assert prefix + "PortSeed.bin" not in seed.namelist(), "Recursive export template"
+    with archive.open(prefix + "PortNativeSeed.bin") as raw, zipfile.ZipFile(raw) as seed:
+        assert set(seed.namelist()) == {prefix + n for n in ("AnkerNative", "wine.zip", "Boxedwine-LICENSE.txt")}
+        with seed.open(prefix + "AnkerNative") as binary:
+            assert binary.read(8) == bytes.fromhex("cffaedfe0c000001"), "Expected arm64 Mach-O interpreter"
+        assert seed.getinfo(prefix + "AnkerNative").external_attr >> 16 & 0o111
 with args.ipa.open("rb") as ipa_file:
     digest = hashlib.sha256()
     for chunk in iter(lambda: ipa_file.read(1024 * 1024), b""):

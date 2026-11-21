@@ -8,7 +8,7 @@ on:
       - 'runtime/ui/**'
       - 'runtime/tools/prepare-archives.sh'
       - 'runtime/tools/embed-export-template.py'
-      - 'runtime/tools/boxedwine_assets.py'
+      - 'runtime/jitless/**'
       - 'runtime/tools/prepare-swift-catalog.py'
       - 'runtime/tools/brand-upstream.py'
       - 'runtime/tools/verify-ipa.py'
@@ -28,6 +28,14 @@ jobs:
       CONFIGURATION: Debug
     steps:
       - uses: actions/checkout@v5
+      - name: Compile and check standalone native interpreter
+        run: |
+          git init -q boxedwine-native
+          git -C boxedwine-native fetch --depth 1 https://github.com/danoon2/Boxedwine.git a0175490bdede73ed63d55485538f604df734ca1
+          git -C boxedwine-native checkout --detach FETCH_HEAD
+          bash runtime/jitless/build.sh boxedwine-native native-interpreter
+          xcrun otool -L native-interpreter/AnkerNative > native-interpreter/dependencies.txt
+          if grep -E 'WebKit|JavaScriptCore' native-interpreter/dependencies.txt; then exit 1; fi
       - name: Validate MetalFX frame interpolation SDK before expensive build
         run: |
           set -euo pipefail
@@ -353,10 +361,7 @@ jobs:
       - name: Verify and package user-signable IPA
         run: |
           mkdir -p dist
-          git init -q boxedwine-dist
-          git -C boxedwine-dist fetch --depth 1 https://github.com/nathalislight/BoxedWine.git 5f8247b1e2eec92e09a0f5199b87356dd43c0c93
-          git -C boxedwine-dist checkout --detach FETCH_HEAD
-          python3 runtime/tools/embed-export-template.py native-src/dist/Madeira.ipa dist/AnkerPort-unsigned.ipa --boxedwine boxedwine-dist
+          python3 runtime/tools/embed-export-template.py native-src/dist/Madeira.ipa dist/AnkerPort-unsigned.ipa --native native-interpreter/AnkerNative --wine boxedwine-native/project/android/BoxedWine/app/src/main/assets/wine17.zip --license boxedwine-native/license.txt
           python3 runtime/tools/verify-ipa.py dist/AnkerPort-unsigned.ipa --revision "$(git -C native-src rev-parse HEAD)"
           shasum -a 256 dist/AnkerPort-unsigned.ipa > dist/SHA256SUMS
       - uses: actions/upload-artifact@v6

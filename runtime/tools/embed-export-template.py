@@ -3,14 +3,16 @@ import argparse
 import plistlib
 import shutil
 import tempfile
-from boxedwine_assets import add_runtime
+
 from pathlib import Path
 from zipfile import ZIP_STORED, ZipFile
 
 parser = argparse.ArgumentParser()
 parser.add_argument("runtime", type=Path)
 parser.add_argument("output", type=Path)
-parser.add_argument("--boxedwine", type=Path, required=True)
+parser.add_argument("--native", type=Path, required=True)
+parser.add_argument("--wine", type=Path, required=True)
+parser.add_argument("--license", type=Path, required=True)
 args = parser.parse_args()
 with ZipFile(args.runtime) as archive:
     infos = [name for name in archive.namelist() if name.startswith("Payload/") and name.endswith(".app/Info.plist") and name.count("/") == 2]
@@ -23,9 +25,11 @@ with ZipFile(args.runtime) as archive:
 shutil.copyfile(args.runtime, args.output)
 with tempfile.TemporaryDirectory() as work:
     seed = Path(work) / "seed.ipa"
-    shutil.copyfile(args.runtime, seed)
-    with ZipFile(seed, "a", allowZip64=True) as archive:
-        add_runtime(archive, prefix + "PortBoxedWine/", args.boxedwine)
+    with ZipFile(seed, "w", allowZip64=True) as archive:
+        archive.write(args.native, prefix + "AnkerNative")
+        archive.write(args.wine, prefix + "wine.zip")
+        archive.write(args.license, prefix + "Boxedwine-LICENSE.txt")
     with ZipFile(args.output, "a", allowZip64=True) as archive:
-        archive.write(seed, prefix + "PortSeed.bin", compress_type=ZIP_STORED)
+        archive.write(args.runtime, prefix + "PortSeed.bin", compress_type=ZIP_STORED)
+        archive.write(seed, prefix + "PortNativeSeed.bin", compress_type=ZIP_STORED)
         archive.writestr(prefix + "PortSeed.plist", plistlib.dumps({"prefix": prefix, "info": plistlib.loads(info)}))
