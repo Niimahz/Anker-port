@@ -6,37 +6,55 @@
 
 [Landscape promo card · 1200 × 630](media/anker-port-cover.jpg) · [Square promo card · 1080 × 1080](media/anker-port-square.jpg) · [App icon](../runtime/ui/PortIcon.png)
 
-## X / Bluesky
+## Reddit · Project introduction
 
-I built Anker Port for Windows games on iPhone. Browse, download an archive, extract it, then pick the EXE and play from your library. Want the game as its own app? Export a standalone IPA with its runtime and files. Bring your own game.
+**I built an iPhone launcher for the Windows games already sitting in my Files app**
 
-https://github.com/Niimahz/Anker-port
+The part that made me build Anker Port was what happened *before* I could press Play. I’d download an archive, unpack it, and then have to remember which EXE actually started the game. Now I import the folder once, pick the EXE, and the next time I want to try it, I tap its cover.
 
-## Reddit / iOS gaming community
+There’s also an export option I wanted for my own phone. It bundles one game and its runtime into an IPA I can sideload as a separate app. Library play uses a Madeira-based runtime with JIT. Standalone exports also have an experimental native JITless mode for compatible 32-bit x86 games.
 
-**Title** · I built Anker Port to take a Windows game archive from Files to a playable library on iPhone
-
-I kept bouncing between a browser, an extractor and a launcher just to try one game. With Anker Port I can download a ZIP, RAR or 7z, extract it on the phone, keep the DLLs and assets together, and select the EXE from the extracted folder. The game gets a cover in Library, where I can open its details and try launching it.
-
-I built the download and library experience around Madeira’s runtime. You’ll need your own game files and a working JIT setup. I’m especially interested in where games get to on different devices: menu, gameplay, or a repeatable exit. There’s a game-report form on GitHub for those details.
-
-Unsigned IPA and setup instructions: https://github.com/Niimahz/Anker-port
-
-You can also export a standalone game IPA and sideload it separately. The experimental JITless option packages a native interpreter for compatible x86 titles. I’m looking for device reports that distinguish reaching a menu from actual gameplay.
-
-## Discord
-
-Anyone here testing Windows games on iPhone? I made Anker Port so you can download and extract a game on-device, import the whole folder, and launch compatible titles through Madeira’s runtime. If you already use LiveContainer with JIT, the README has the unsigned IPA and a five-step setup. I’d love to hear which game you try first.
+If you try a title, I’d love to know the first thing you actually saw on screen. A main menu, a playable level, or the exact point it closed are all useful results.
 
 https://github.com/Niimahz/Anker-port
 
-## Instagram / Telegram · فارسی
+## X / Bluesky · Short launch post
 
-انکر پورت رو برای این ساختم که از دانلود یک بازی ویندوزی تا رسیدن به دکمهٔ Play، همه‌چیز روی خود آیفون دم دستم باشه. آرشیو رو دانلود می‌کنی، همون‌جا بازش می‌کنی و فایل EXE رو انتخاب می‌کنی. بعد بازی با کاورش میاد توی Library.
+That Windows game folder sitting in Files? I built Anker Port to give it a Play button. Unpack the archive on iPhone, choose the EXE, then launch compatible games from their covers. Which game would you try first?
 
-اگه می‌خوای بازی آیکن خودش رو داشته باشه، از صفحهٔ بازی Export game IPA رو بزن. فایل بازی و موتور اجرا با هم توی یک IPA ذخیره می‌شن که می‌تونی جداگانه سایدلود کنی. برای بازی‌های سازگار، گزینهٔ آزمایشی JITless هم هست که روی خود گوشی و بدون WebKit اجرا می‌شه.
+https://github.com/Niimahz/Anker-port
 
-برای بازی از داخل کتابخونه، از موتور Madeira و JIT استفاده می‌کنه. اگه امتحانش کردی، برام بنویس روی چه آیفونی و با کدوم بازی تا کجا رفتی. فایل IPA و راهنمای نصب توی گیت‌هابه 👇
+## Threads · Standalone IPA
+
+My favorite button in Anker Port is “Export game IPA.” I pick a game from my library and it bundles the game files with the software that runs them. After sideloading, that game has its own icon on my Home Screen.
+
+There’s a With JIT option and an experimental native JITless option for compatible 32-bit x86 games. Which game would you give its own icon?
+
+https://github.com/Niimahz/Anker-port
+
+## Discord · Compatibility testers
+
+Anyone here testing Windows games on iPhone? I’m the developer of Anker Port and I’d love a second data point for a game you already own. Import its folder, select the main EXE, and try Play. If you export a standalone IPA instead, mention which mode you picked.
+
+A one-line reply is enough: game + edition / iPhone + iOS / Library or export mode / last thing you saw. Even “audio started, screen stayed black” helps me narrow it down.
+
+https://github.com/Niimahz/Anker-port
+
+## Instagram · فارسی
+
+کدوم بازی قدیمی کامپیوترت رو دوست داشتی همین الان از روی آیفونت باز کنی؟ 🎮
+
+من Anker Port رو برای همین ساختم. اگه پوشهٔ بازی رو داری، همون رو وارد می‌کنی و فایل اجراییش رو انتخاب می‌کنی. از اون به بعد بازی با کاورش توی کتابخونه‌ته. اگه هم فایلش ZIP یا RAR باشه، روی خود گوشی بازش می‌کنی.
+
+اون گزینه‌ای که خودم بیشتر دوست دارم **Export game IPA**ـه. بازی و موتورش رو توی یک فایل می‌ذاره که بعد از سایدلود، آیکن خودش رو روی صفحهٔ آیفون داشته باشه. سازگاری به بازی و تنظیمات گوشی بستگی داره. اسم اولین بازی‌ای که امتحان می‌کنی رو برام بنویس 👇
+
+گیت‌هاب: Niimahz/Anker-port
+
+## Telegram · فارسی
+
+اگه بازی ویندوزیت چندتا پوشه و یه فایل EXE داره، لازم نیست تک‌تک فایل‌هاشو روی آیفون جابه‌جا کنی. توی Anker Port کل پوشه رو وارد کن تا فایل‌های صدا و تصویر هم کنار بازی بمونن. بازی رو هنوز دانلود نکردی؟ صفحهٔ سازنده رو توی Browser باز کن یا لینک مستقیم رو توی Downloads بذار.
+
+نسخهٔ آیفون و راهنمای نصب رو توی گیت‌هاب گذاشتم. اگه تستش کردی، مدل آیفون، اسم بازی و اینکه تا منو رسید یا وارد گیم‌پلی شد رو بفرست. همین سه تا جزئیات برای نفر بعدی که همون بازی رو داره ارزش داره.
 
 https://github.com/Niimahz/Anker-port
 
