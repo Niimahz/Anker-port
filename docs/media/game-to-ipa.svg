@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 312" role="img" aria-labelledby="title desc">
+<title id="title">From a Windows archive to an iPhone game library</title>
+<desc id="desc">Browser or Files supplies an archive. Downloads extracts the game folder. The library lets you play or export a standalone IPA.</desc>
+<defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#111b30"/><stop offset="1" stop-color="#112e32"/></linearGradient></defs>
+<rect width="1040" height="312" rx="24" fill="url(#bg)"/>
+<g font-family="system-ui,sans-serif" fill="#f5f8fc">
+<text x="42" y="55" font-size="27" font-weight="700">One game folder, two ways to play</text>
+<g fill="none" stroke="#6ed6bd" stroke-width="3"><path d="M198 166h49m185 0h47m171 0h38q12 0 12-12v-36q0-12 12-12h23m-85 60h38q12 0 12 12v36q0 12 12 12h23"/></g>
+<g fill="#182a40" stroke="#426078"><rect x="42" y="126" width="156" height="80" rx="14"/><rect x="247" y="126" width="185" height="80" rx="14"/><rect x="479" y="126" width="171" height="80" rx="14"/></g>
+<g fill="#183e3c" stroke="#58bda7"><rect x="735" y="68" width="260" height="76" rx="14"/><rect x="735" y="188" width="260" height="76" rx="14"/></g>
+<g font-size="21" font-weight="650"><text x="58" y="160">Browse</text><text x="263" y="160">Extract</text><text x="495" y="160">Import</text><text x="755" y="102">Play from Library</text><text x="755" y="222">Export game IPA</text></g>
+<g font-size="16" fill="#c6d9e4"><text x="58" y="186">or open Files</text><text x="263" y="186">ZIP, RAR, 7z…</text><text x="495" y="186">Select the EXE</text><text x="755" y="128">Launch a compatible title</text><text x="755" y="248">Sideload the standalone app</text></g></g></svg>

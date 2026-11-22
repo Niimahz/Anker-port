@@ -8,7 +8,7 @@
 
 ## X / Bluesky
 
-I built Anker Port to take a Windows game archive from download to library on my iPhone. Extract the archive, pick the EXE, then open the game from its cover. Built on Madeira, with JIT for compatible games. Unsigned IPA and setup guide:
+I built Anker Port for Windows games on iPhone. Browse, download an archive, extract it, then pick the EXE and play from your library. Want the game as its own app? Export a standalone IPA with its runtime and files. Bring your own game.
 
 https://github.com/Niimahz/Anker-port
 
@@ -22,6 +22,8 @@ I built the download and library experience around Madeira’s runtime. You’ll
 
 Unsigned IPA and setup instructions: https://github.com/Niimahz/Anker-port
 
+You can also export a standalone game IPA and sideload it separately. The experimental JITless option packages a native interpreter for compatible x86 titles. I’m looking for device reports that distinguish reaching a menu from actual gameplay.
+
 ## Discord
 
 Anyone here testing Windows games on iPhone? I made Anker Port so you can download and extract a game on-device, import the whole folder, and launch compatible titles through Madeira’s runtime. If you already use LiveContainer with JIT, the README has the unsigned IPA and a five-step setup. I’d love to hear which game you try first.
@@ -32,7 +34,9 @@ https://github.com/Niimahz/Anker-port
 
 انکر پورت رو برای این ساختم که از دانلود یک بازی ویندوزی تا رسیدن به دکمهٔ Play، همه‌چیز روی خود آیفون دم دستم باشه. آرشیو رو دانلود می‌کنی، همون‌جا بازش می‌کنی و فایل EXE رو انتخاب می‌کنی. بعد بازی با کاورش میاد توی Library.
 
-برای اجرای بازی‌های سازگار از موتور Madeira و JIT استفاده می‌کنه. اگه امتحانش کردی، برام بنویس روی چه آیفونی و با کدوم بازی تا کجا رفتی. فایل IPA و راهنمای نصب توی گیت‌هابه 👇
+اگه می‌خوای بازی آیکن خودش رو داشته باشه، از صفحهٔ بازی Export game IPA رو بزن. فایل بازی و موتور اجرا با هم توی یک IPA ذخیره می‌شن که می‌تونی جداگانه سایدلود کنی. برای بازی‌های سازگار، گزینهٔ آزمایشی JITless هم هست که روی خود گوشی و بدون WebKit اجرا می‌شه.
+
+برای بازی از داخل کتابخونه، از موتور Madeira و JIT استفاده می‌کنه. اگه امتحانش کردی، برام بنویس روی چه آیفونی و با کدوم بازی تا کجا رفتی. فایل IPA و راهنمای نصب توی گیت‌هابه 👇
 
 https://github.com/Niimahz/Anker-port
 
