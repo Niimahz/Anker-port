@@ -47,6 +47,17 @@ def install(root: Path):
                     PortMark().frame(width: 30, height: 29)
                     Text("Anker Port").font(.system(.headline, design: .rounded, weight: .heavy))
                 }.accessibilityElement(children: .combine)
+            }
+            if tab == 4, let supportURL = URL(string: "https://buymeacoffee.com/Niimahz") {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Link(destination: supportURL) {
+                        Image(systemName: "cup.and.saucer.fill")
+                            .resizable().scaledToFit()
+                            .foregroundStyle(PortStyle.accent)
+                            .frame(width: 30, height: 29)
+                    }
+                    .accessibilityLabel("Buy Me a Coffee")
+                }
             }""")
     change('@State private var search = ""', '@State private var search = ""\n    @State private var showsSources = false')
     change('Group { if LibraryGridArm.zoomable(setting: zoomableGrid, layout: layout)', 'Group { if showsSources && LibraryGridArm.zoomable(setting: zoomableGrid, layout: layout)')
