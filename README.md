@@ -1,20 +1,45 @@
 # Anker Port
 
-![Anker Port — a Windows game library for your iPhone](docs/media/anker-port-cover.jpg)
+**Bring your Windows games to iPhone.**
 
-**Bring a Windows game folder to your iPhone. Play it from your library or build a standalone game IPA.**
-
-Browse to a game archive, download it and unpack it on-device. Pick the main EXE once and open the game from its cover. For a standalone app, export the game files together with a runtime and launch profile. Anker Port brings Anker’s download and import workflow into a native iOS launcher built on Madeira. You supply the game files. Launch compatibility depends on the game, device and JIT setup.
+Start with a game archive and finish with a cover you can tap to play. Anker Port puts a browser, downloader, archive extractor and Windows game launcher on your iPhone. Want one game on its own? Package its files and runtime as a standalone iOS app.
 
 **[Download the unsigned IPA](https://github.com/Niimahz/Anker-port/actions/runs/44961914737/artifacts/14732869981)** · [Browse builds](https://github.com/Niimahz/Anker-port/actions/workflows/build-ipa.yml) · [Report a game result](https://github.com/Niimahz/Anker-port/issues/new?template=game-report.yml)
 
-![Anker Port workflow from archive to Play or Export game IPA](docs/media/game-to-ipa.svg)
+![Anker Port — a Windows game library for your iPhone](docs/media/anker-port-cover.jpg)
 
-## Build a standalone game IPA
+## Browser · Find the game files
 
-Open a game’s details and tap **Export game IPA**. Confirm the folder containing its EXE, DLLs and assets. Choose **With JIT** for the Madeira-based runtime, or **JITless · Native interpreter** for experimental local execution of compatible 32-bit x86 Windows games. The JITless game app uses a native interpreter without WebKit.
+Open a developer’s download page in the built-in browser and follow its download link right there. Use the address bar to visit another site, go back to the release notes to check which edition you need, or reload the page before choosing a file.
 
-Look in **Files → On My iPhone → Anker Port → Anker IPA** for the finished package. Sign or sideload the exported IPA, then open the game as its own app. Keep enough free space for a writable copy on first launch. A successful export confirms that the app was packaged. Game compatibility and performance still depend on the chosen runtime.
+## Downloads · Start with a link or a local archive
+
+Already have the file URL? Paste the direct HTTPS link into **Downloads**. If you found the archive through the browser, open **Downloads → Files** to work with it after the transfer. If the game is already unpacked on your phone, import its folder directly.
+
+## Extract · Keep the whole game together
+
+Tap **Extract** to unpack ZIP and ZIP64, RAR and RAR5, 7z, TAR, TAR.GZ, TGZ or Gzip on-device. Import the resulting folder so the EXE can find its DLLs, audio and other assets. When a folder contains both a game and a setup utility, choose which EXE the library should launch.
+
+## Library · Pick a game by its cover
+
+Browse cover art in **Library → Collection**, open a title’s details, or return to a recently played game from **Home**. Steam title lookup helps identify a game when its archive or executable has an unfamiliar filename.
+
+## Play · Launch from your collection
+
+Tap a cover and press **Play** to launch a compatible Windows game locally through the Madeira-based runtime. Check JIT and Memory+ in **Settings** and open the gameplay or device settings when a title needs tuning. Game compatibility depends on the title, device and runtime configuration.
+
+## IPA Export · Give a game its own app
+
+Open **Export game IPA** on the game’s details page and confirm its folder. Anker Port bundles the game files with a runtime so you can sideload that game separately and open it from its own icon.
+
+| Export option | What goes into the game app |
+| --- | --- |
+| **With JIT** | The Madeira-based runtime and the game’s launch profile, for compatible x86 and x64 Windows titles on a JIT-enabled setup. |
+| **JITless · Native interpreter** | A native interpreter that runs locally without WebKit or JIT. This mode is experimental and supports 32-bit x86 executables. |
+
+The finished unsigned IPA saves automatically in **Files → On My iPhone → Anker Port → Anker IPA**. Sign or sideload it using your usual setup. Allow space for the writable game copy created on first launch.
+
+![From a Windows archive to in-library play or standalone IPA export](docs/media/game-to-ipa.svg)
 
 ## Get started
 
@@ -24,17 +49,7 @@ Look in **Files → On My iPhone → Anker Port → Anker IPA** for the finished
 4. In **Downloads → Files**, find your archive and tap **Extract** if needed. Import the extracted game folder, keeping the EXE, DLLs and assets together. If the app finds multiple executables, choose the game’s main EXE.
 5. Open **Library → Collection**, tap the game’s cover, then **Play**.
 
-## Browse, download and play
-
-| Destination | What you can do |
-| --- | --- |
-| Home | Return to a recently played game or jump to your library. |
-| Library | Browse your collection by cover art, open game details, or switch to Sources. |
-| Downloads | Paste a direct HTTPS link or open a downloaded archive in Files. Extract it on-device, import the whole game folder and look up the title on Steam. |
-| Browser | Enter a website address and follow its own download links. Back, Forward and Reload keep the source page within reach. |
-| Settings | Check JIT and Memory+, then open controls grouped under Stores, Gameplay, Device and App. |
-
-### Archive support
+## Archive details
 
 ZIP (including ZIP64), RAR/RAR5, 7z, TAR, TAR.GZ/TGZ and single-file Gzip. ZIP methods include Store, Deflate, LZMA, Zstandard (93), XZ (95) and PPMd. Password-protected archives and entries containing links have extraction limitations. A game that extracts successfully may still need runtime-specific settings to launch.
 
