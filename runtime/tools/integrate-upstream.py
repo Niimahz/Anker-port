@@ -283,6 +283,13 @@ private final class AnkerDownloadModel: ObservableObject {
                 try? FileManager.default.removeItem(at: destination)
                 throw error
             }
+            // Roll back the copied directory if validation fails.
+            var copiedTreeValidated = false
+            defer {
+                if !copiedTreeValidated {
+                    try? FileManager.default.removeItem(at: destination)
+                }
+            }
             // Verify the copied tree completely before offering any launch target.
             // A partial directory scan must not silently register an arbitrary EXE.
             var candidates: [URL] = []
@@ -315,6 +322,12 @@ private final class AnkerDownloadModel: ObservableObject {
                 }
             }
             if let scanError { throw scanError }
+            guard !candidates.isEmpty else {
+                throw NSError(domain: "AnkerImport", code: 9, userInfo: [
+                    NSLocalizedDescriptionKey: "Copied folder has no readable Windows EXE."
+                ])
+            }
+            copiedTreeValidated = true
             if candidates.count == 1, let executable = candidates.first {
                 do {
                     try addToLibrary(executable)
