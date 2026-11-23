@@ -193,7 +193,16 @@ private final class AnkerDownloadModel: ObservableObject {
             let destination = targetFolder.appendingPathComponent(
                 UUID().uuidString + "-" + sourceFolder.lastPathComponent, isDirectory: true)
             try FileManager.default.copyItem(at: sourceFolder, to: destination)
-            let target = destination.appendingPathComponent(file.lastPathComponent)
+            // Keep the relative path for EXEs in nested subfolders.
+            let sourceRoot = sourceFolder.standardizedFileURL.path + "/"
+            let executablePath = file.standardizedFileURL.path
+            guard executablePath.hasPrefix(sourceRoot) else {
+                throw NSError(domain: "AnkerImport", code: 5, userInfo: [
+                    NSLocalizedDescriptionKey: "Executable is outside the selected game folder."
+                ])
+            }
+            let relativePath = String(executablePath.dropFirst(sourceRoot.count))
+            let target = destination.appendingPathComponent(relativePath)
             do {
                 try addToLibrary(target)
                 status = "Game folder and executable added to your library."
