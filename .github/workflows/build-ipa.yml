@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'runtime/tools/integrate-upstream.py'
+      - 'tests/**'
       - 'runtime/ui/**'
       - 'runtime/tools/prepare-archives.sh'
       - 'runtime/tools/embed-export-template.py'
