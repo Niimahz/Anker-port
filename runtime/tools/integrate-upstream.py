@@ -283,22 +283,38 @@ private final class AnkerDownloadModel: ObservableObject {
                 try? FileManager.default.removeItem(at: destination)
                 throw error
             }
+            // Verify the copied tree completely before offering any launch target.
+            // A partial directory scan must not silently register an arbitrary EXE.
             var candidates: [URL] = []
-            if let walker = FileManager.default.enumerator(at: destination,
-                    includingPropertiesForKeys: [.isRegularFileKey],
-                    options: [.skipsHiddenFiles]) {
-                while let file = walker.nextObject() as? URL {
-                    if (try? file.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true {
-                        walker.skipDescendants()
-                        continue
-                    }
-                    if file.pathExtension.lowercased() == "exe",
-                       (try? file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true {
-                        candidates.append(file)
-                        if candidates.count >= 500 { break }
+            var scanError: Error?
+            guard let walker = FileManager.default.enumerator(at: destination,
+                    includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
+                    options: [], errorHandler: { _, error in
+                        scanError = error
+                        return false
+                    }) else {
+                try? FileManager.default.removeItem(at: destination)
+                throw NSError(domain: "AnkerImport", code: 6, userInfo: [
+                    NSLocalizedDescriptionKey: "Cannot inspect copied game folder."
+                ])
+            }
+            while let file = walker.nextObject() as? URL {
+                let values = try file.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+                guard values.isSymbolicLink != true else {
+                    throw NSError(domain: "AnkerImport", code: 7, userInfo: [
+                        NSLocalizedDescriptionKey: "Copied game contains a symbolic link."
+                    ])
+                }
+                if file.pathExtension.lowercased() == "exe", values.isRegularFile == true {
+                    candidates.append(file)
+                    guard candidates.count <= 500 else {
+                        throw NSError(domain: "AnkerImport", code: 8, userInfo: [
+                            NSLocalizedDescriptionKey: "More than 500 EXE files; choose a smaller game folder."
+                        ])
                     }
                 }
             }
+            if let scanError { throw scanError }
             if candidates.count == 1, let executable = candidates.first {
                 do {
                     try addToLibrary(executable)
