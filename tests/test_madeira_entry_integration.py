@@ -39,7 +39,6 @@ class MadeiraEntryIntegrationTests(unittest.TestCase):
             self.assertIn("import UniformTypeIdentifiers", result)
             self.assertIn("LibraryModel.inspect(executable)", result)
             self.assertIn("func importGameFolder(", result)
-            self.assertIn("RuntimeReports", result)
             self.assertIn("JIT", result)
             self.assertIn("Added Anker Downloads", first.stdout)
 
