@@ -85,6 +85,24 @@ jobs:
           python3 runtime/tools/brand-upstream.py native-src
           python3 runtime/tools/integrate-upstream.py native-src
           python3 runtime/tools/prepare-swift-catalog.py native-src
+          # Verify the real pinned launch chain, not only a synthetic entry fixture.
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path("native-src/app/Madeira")
+          entry = (root / "MadeiraApp.swift").read_text()
+          content = (root / "ContentView.swift").read_text()
+          def require(source, *tokens):
+              for token in tokens:
+                  if token not in source:
+                      raise SystemExit("Native launch contract missing: " + token)
+          require(entry, "ANKER_PORT_INTEGRATION_V1", "LibraryModel.inspect(executable)", "library.save(entry)", "JITCoordinator.shared")
+          launch = content.split("private func launchLibraryEntry(", 1)[1].split("private func startLibraryEntry(", 1)[0]
+          require(launch, "jitReadyForLaunch(inLibrary: true", "startLibraryEntry(entry)")
+          start = content.split("private func startLibraryEntry(", 1)[1].split("static func reassertBCDSwitches(", 1)[0]
+          require(start, "LibraryModel.executable(entry.launchRelativePath)", "entry.configureLaunch()", "LogStore.shared.startSessionLog", "library.begin(entry)", "runWineFullSequence(profile: entry)")
+          require(content, "wine_process_start(winePrefixPath)")
+          print("Pinned native launch source contract passed; device execution remains unverified.")
+          PY
           cd native-src/app/Madeira
           # The pinned Madeira target contains all Swift files under this directory.
           sources=()
